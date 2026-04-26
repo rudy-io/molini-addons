@@ -1,0 +1,74 @@
+---
+# Manifeste add-on Home Assistant — Moli Agent
+# Doc référence : https://developers.home-assistant.io/docs/add-ons/configuration
+
+slug: molini_agent
+name: Moli Agent
+version: "0.4.0"
+description: >-
+  Agent Moli pour Home Assistant OS — heartbeat 5 min vers le central
+  moli.energy, backups quotidiens chiffrés age + upload MinIO, et exécution
+  des commandes admin envoyées depuis l'admin moli.energy.
+url: https://moli.energy
+arch:
+  - amd64
+  - aarch64
+
+# Démarre après HA Core, mode service longue durée
+boot: auto
+startup: services
+init: false
+
+# Accès API
+homeassistant_api: true   # /api/* via http://supervisor/core/api avec SUPERVISOR_TOKEN
+hassio_api: true          # /supervisor/* /addons/* /core/restart pour ha_restart, stack_update
+hassio_role: manager      # nécessaire pour update / install / start / stop d'autres add-ons
+
+# Pas de host_network : le bridge hassio est suffisant car on parle au superviseur
+# (http://supervisor) et au central via HTTPS sortant standard. host_network
+# poserait un risque de conflit DNS sur certaines versions HAOS.
+
+# Mappings volumes
+# - config:rw  → /config (HA) — écrit packages/molini_discovered.yaml et lit pour backup
+# - share:rw   → /share — données Z2M / autres add-ons
+# - addons:rw  → /addons — configs add-ons (lecture pour backup, jamais d'écriture)
+# - backup:rw  → /backup — éventuels snapshots HA à inclure dans nos backups
+map:
+  - config:rw
+  - share:rw
+  - addons:ro
+  - backup:ro
+
+# Options exposées dans l'UI add-on (Configuration tab)
+options:
+  central_url: "https://moli.energy"
+  client_token: ""
+  heartbeat_interval_s: 300
+  linky_power_entity: "sensor.linky_puissance_apparente"
+  linky_hc_entity: "sensor.linky_index_hchc"
+  linky_hp_entity: "sensor.linky_index_hchp"
+  linky_tempo_today_entity: "sensor.rte_tempo_couleur_actuelle"
+  linky_tempo_tomorrow_entity: "sensor.rte_tempo_prochaine_couleur"
+  backup_age_recipient: ""
+  backup_hour_local: 3
+  backup_volumes: "/config,/share/zigbee2mqtt"
+  log_level: "info"
+
+# Schema de validation des options ci-dessus
+schema:
+  central_url: "url"
+  client_token: "password"
+  heartbeat_interval_s: "int(60,3600)"
+  linky_power_entity: "str"
+  linky_hc_entity: "str"
+  linky_hp_entity: "str"
+  linky_tempo_today_entity: "str"
+  linky_tempo_tomorrow_entity: "str"
+  backup_age_recipient: "str"
+  backup_hour_local: "int(0,23)"
+  backup_volumes: "str"
+  log_level: "list(trace|debug|info|notice|warning|error|fatal)"
+
+# Pas de champ `image:` : on laisse le superviseur builder localement à partir
+# du Dockerfile + build.yaml. Si on publie un jour l'image sur ghcr.io,
+# rétablir : image: ghcr.io/molini/molini-agent-{arch}

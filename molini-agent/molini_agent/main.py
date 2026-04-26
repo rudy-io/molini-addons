@@ -1,0 +1,121 @@
+import asyncio
+import logging
+import signal
+import sys
+from typing import Any
+
+import httpx
+
+from .backup import backup_loop
+from .commands import poll_and_execute
+from .config import AGENT_VERSION, Config, configure_logging
+from .ha_client import HAClient
+from .metrics import agent_uptime_seconds, collect_metrics
+from .runtime import RUNTIME
+
+
+configure_logging()
+log = logging.getLogger("molini_agent")
+
+
+async def send_heartbeat(cfg: Config, payload: dict[str, Any]) -> bool:
+    url = f"{cfg.central_url}/api/agent/heartbeat"
+    headers = {"Authorization": f"Bearer {cfg.client_token}"}
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.post(url, headers=headers, json=payload)
+            if r.status_code >= 400:
+                log.warning("Heartbeat rejected (%s): %s", r.status_code, r.text[:200])
+                return False
+            return True
+    except httpx.HTTPError as e:
+        log.warning("Heartbeat network error: %s", e)
+        return False
+
+
+async def loop(cfg: Config) -> None:
+    stop = asyncio.Event()
+
+    def _handle_signal(*_: Any) -> None:
+        log.info("Stop signal received, exiting cleanly")
+        stop.set()
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            asyncio.get_running_loop().add_signal_handler(sig, _handle_signal)
+        except (NotImplementedError, RuntimeError):
+            pass
+
+    ha = HAClient(cfg.ha_url, cfg.ha_token)
+    backup_task: asyncio.Task[None] | None = None
+    try:
+        ha_config = await ha.config()
+        ha_version = (ha_config or {}).get("version")
+        log.info(
+            "Moli Agent %s starting — runtime=%s central=%s ha_version=%s interval=%ss",
+            AGENT_VERSION,
+            RUNTIME,
+            cfg.central_url,
+            ha_version,
+            cfg.heartbeat_interval_s,
+        )
+
+        backup_task = asyncio.create_task(backup_loop(cfg))
+
+        while not stop.is_set():
+            try:
+                metrics = await collect_metrics(cfg, ha)
+            except Exception as e:
+                log.exception("Metrics collection failed: %s", e)
+                metrics = {}
+
+            payload: dict[str, Any] = {
+                "agent_version": AGENT_VERSION,
+                "uptime_seconds": agent_uptime_seconds(),
+                "metrics": metrics,
+                "runtime": RUNTIME,
+            }
+            if ha_version:
+                payload["ha_version"] = ha_version
+
+            ok = await send_heartbeat(cfg, payload)
+            log.info(
+                "Heartbeat %s — power=%sW cpu=%s%% ram=%s%% entities=%s",
+                "OK" if ok else "FAIL",
+                metrics.get("linky_power_w"),
+                metrics.get("cpu_pct"),
+                metrics.get("ram_pct"),
+                metrics.get("ha_entities_count"),
+            )
+
+            try:
+                await poll_and_execute(cfg)
+            except Exception as e:
+                log.exception("Command polling error: %s", e)
+
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=cfg.heartbeat_interval_s)
+            except asyncio.TimeoutError:
+                pass
+    finally:
+        if backup_task and not backup_task.done():
+            backup_task.cancel()
+            try:
+                await backup_task
+            except asyncio.CancelledError:
+                pass
+        await ha.close()
+
+
+def run() -> None:
+    try:
+        cfg = Config.from_env()
+    except RuntimeError as e:
+        log.error("%s", e)
+        sys.exit(1)
+
+    asyncio.run(loop(cfg))
+
+
+if __name__ == "__main__":
+    run()

@@ -1,0 +1,7 @@
+---
+# Manifeste du repo d'add-ons Moli pour Home Assistant.
+# À ajouter dans HA via : Settings → Add-ons → ⋮ → Repositories → Add
+# URL du repo : https://github.com/rudy-io/molini-addons
+name: Moli Add-ons
+url: https://github.com/rudy-io/molini-addons
+maintainer: MARLOONA SASU <contact@moli.energy>

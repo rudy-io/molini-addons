@@ -1,0 +1,8 @@
+# Force LF pour tout — l'add-on tourne sous Alpine + s6, qui plante avec CRLF
+* text=auto eol=lf
+
+# Binaire (au cas où)
+*.png binary
+*.jpg binary
+*.ico binary
+*.tar.gz binary

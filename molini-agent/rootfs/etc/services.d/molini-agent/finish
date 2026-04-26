@@ -1,0 +1,15 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Hook s6 appelé quand le service exit. On termine l'add-on entier (s6 sinon
+# essaierait de relancer la boucle interne).
+# ==============================================================================
+bashio::log.info "Moli Agent stopped (exit ${1:-0})"
+
+# Si l'agent a fait un agent_restart volontaire (exit 0), on demande au
+# superviseur de relancer le service. Sinon on laisse échouer.
+if [[ "${1}" == "0" ]]; then
+  bashio::log.info "Voluntary stop — s6 will restart the service"
+  exec /run/s6/basedir/bin/halt
+fi
+
+exit "${1:-0}"

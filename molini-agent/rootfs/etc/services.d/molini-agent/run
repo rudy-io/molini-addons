@@ -1,0 +1,69 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Wrapper bashio → env vars → python -m molini_agent
+# ==============================================================================
+# Le superviseur HA injecte SUPERVISOR_TOKEN automatiquement, on l'utilise pour
+# accéder à HA Core via http://supervisor/core/api (pas besoin de Long-Lived
+# Access Token côté utilisateur).
+# ==============================================================================
+set -e
+
+# ─── Lecture des options config.yaml ──────────────────────────────────────────
+export CENTRAL_URL="$(bashio::config 'central_url')"
+export CLIENT_TOKEN="$(bashio::config 'client_token')"
+export HEARTBEAT_INTERVAL_S="$(bashio::config 'heartbeat_interval_s')"
+export LINKY_POWER_ENTITY="$(bashio::config 'linky_power_entity')"
+export LINKY_HC_ENTITY="$(bashio::config 'linky_hc_entity')"
+export LINKY_HP_ENTITY="$(bashio::config 'linky_hp_entity')"
+export LINKY_TEMPO_TODAY_ENTITY="$(bashio::config 'linky_tempo_today_entity')"
+export LINKY_TEMPO_TOMORROW_ENTITY="$(bashio::config 'linky_tempo_tomorrow_entity')"
+export BACKUP_AGE_RECIPIENT="$(bashio::config 'backup_age_recipient')"
+export BACKUP_HOUR_LOCAL="$(bashio::config 'backup_hour_local')"
+export BACKUP_VOLUMES="$(bashio::config 'backup_volumes')"
+LOG_LEVEL="$(bashio::config 'log_level')"
+
+# ─── HA Core via supervisor proxy ─────────────────────────────────────────────
+# SUPERVISOR_TOKEN est injecté par le superviseur HA dans tout add-on ayant
+# homeassistant_api: true ou hassio_api: true.
+if bashio::var.has_value "${SUPERVISOR_TOKEN}"; then
+  export HA_URL="http://supervisor/core"
+  export HA_TOKEN="${SUPERVISOR_TOKEN}"
+  export SUPERVISOR_URL="http://supervisor"
+  bashio::log.info "Using supervisor proxy for HA Core API."
+else
+  bashio::log.warning "SUPERVISOR_TOKEN missing — falling back to localhost:8123 (anormal en HAOS)"
+  export HA_URL="http://localhost:8123"
+fi
+
+# ─── Validation minimale ──────────────────────────────────────────────────────
+if ! bashio::var.has_value "${CENTRAL_URL}"; then
+  bashio::exit.nok "central_url is required"
+fi
+if ! bashio::var.has_value "${CLIENT_TOKEN}"; then
+  bashio::exit.nok "client_token is required (générer côté admin moli.energy)"
+fi
+
+# ─── Backup recipient — warn si vide ──────────────────────────────────────────
+if ! bashio::var.has_value "${BACKUP_AGE_RECIPIENT}"; then
+  bashio::log.warning "backup_age_recipient vide — backups quotidiens skippés."
+fi
+
+# ─── Niveau de log ────────────────────────────────────────────────────────────
+case "${LOG_LEVEL}" in
+  trace|debug)   PY_LOG_LEVEL="DEBUG" ;;
+  info|notice)   PY_LOG_LEVEL="INFO" ;;
+  warning)       PY_LOG_LEVEL="WARNING" ;;
+  error|fatal)   PY_LOG_LEVEL="ERROR" ;;
+  *)             PY_LOG_LEVEL="INFO" ;;
+esac
+export MOLINI_LOG_LEVEL="${PY_LOG_LEVEL}"
+
+# ─── Path packages HA pour ha_provision ──────────────────────────────────────
+# Sous HAOS le dossier /config est mappé vers /homeassistant côté core.
+export HA_PACKAGES_DIR="/config/packages"
+mkdir -p "${HA_PACKAGES_DIR}"
+
+bashio::log.info "Moli Agent ${AGENT_VERSION} starting — central=${CENTRAL_URL} interval=${HEARTBEAT_INTERVAL_S}s runtime=${MOLINI_RUNTIME}"
+
+cd /app
+exec python3 -m molini_agent

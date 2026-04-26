@@ -1,0 +1,14 @@
+---
+# Build local par le superviseur HA (pas de push registry externe).
+# Base images officielles HA = Alpine + Python 3.12 + bashio + s6-overlay.
+
+build_from:
+  amd64: ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20
+  aarch64: ghcr.io/home-assistant/aarch64-base-python:3.12-alpine3.20
+
+labels:
+  org.opencontainers.image.title: Moli Agent
+  org.opencontainers.image.description: Agent Moli pour Home Assistant OS
+  org.opencontainers.image.source: https://github.com/molini/molini-addons
+  org.opencontainers.image.licenses: Proprietary
+  org.opencontainers.image.vendor: MARLOONA SASU
