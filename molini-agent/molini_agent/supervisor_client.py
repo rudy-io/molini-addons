@@ -93,3 +93,19 @@ async def addon_options(slug: str, options: dict[str, Any]) -> dict[str, Any]:
 async def store_repositories_add(url: str) -> dict[str, Any]:
     """Ajoute un repo add-on dans le store HA."""
     return await _post("/store/repositories", json={"repository": url})
+
+
+async def store_addons_list() -> list[dict[str, Any]]:
+    """Liste les add-ons exposés par le store (catalogue, pas installés).
+
+    Utilisé pour résoudre dynamiquement le slug d'un add-on présent dans un
+    repo communautaire (ex. cloudflared de brenner-tobias) après ajout du
+    repo via ``store_repositories_add``.
+    """
+    data = await _get("/store/addons")
+    return (data.get("data") or {}).get("addons") or []
+
+
+async def store_info() -> dict[str, Any]:
+    """Renvoie le contenu complet du store (addons + repositories)."""
+    return (await _get("/store")).get("data") or {}

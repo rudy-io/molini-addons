@@ -18,3 +18,5 @@ venv/
 .env
 .env.local
 *.tar.gz
+NIGHT-NOTES-*.md
+molini-agent/NIGHT-NOTES-*.md

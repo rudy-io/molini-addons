@@ -84,6 +84,41 @@ distantes »). Elles sont récupérées par l'agent à chaque heartbeat
 | `tunnel_install`   | Installe + démarre l'add-on cloudflared avec le token CF fourni      |
 | `tunnel_uninstall` | Stop + uninstall l'add-on cloudflared                                |
 | `ha_provision`     | Détecte les entités Linky/Tempo/Solaire et écrit un YAML d'override  |
+| `bootstrap_stack`  | Provisionne Mosquitto + Z2M + cloudflared + patch HA (idempotent)    |
+| `install_addon`    | Installe 1 add-on précis (mosquitto / zigbee2mqtt / cloudflared)     |
+| `patch_ha_config`  | Patch deep-merge de `configuration.yaml` (clés white-listées)        |
+
+## Bootstrap automatique (chantier A — depuis 0.5.0)
+
+Pour réduire les frictions d'install (≈3 h documentés au pilote Carole le
+25/05/2026), l'installateur ne fait plus que :
+
+1. Brancher la box (RJ45 + USB-C) + SkyConnect Zigbee.
+2. Faire l'onboarding HA (créer le compte Owner + `moli-support`).
+3. Installer l'add-on Moli Agent depuis le repo `molini-addons`, coller
+   le `client_token` + démarrer.
+
+Au premier heartbeat, le central voit que `bootstrap_state.mosquitto` est
+`not_installed`, et peut enqueue automatiquement la commande
+`bootstrap_stack`. L'agent installe ensuite :
+
+- Mosquitto broker (slug `core_mosquitto`) — démarré
+- Zigbee2MQTT (slug `45df7312_zigbee2mqtt`) — démarré
+- Cloudflared de Tobi (résolu dynamiquement, pattern `*_cloudflared`)
+  — installé mais **pas démarré** (attend le token via `tunnel_install`)
+- Patch `/config/configuration.yaml` :
+  - `http.use_x_forwarded_for: true`
+  - `http.trusted_proxies: [172.30.0.0/16]`
+  - `recorder.purge_keep_days: 14`
+
+Une 2e exécution de `bootstrap_stack` est **idempotente** : 0 ré-installation,
+0 patch superflu. Le rapport `result.summary` indique précisément ce qui a
+été fait : `2 installed, 1 skipped, 0 failed`.
+
+**HA Restart pending** : après le patch `configuration.yaml`, le flag
+`ha_restart_pending` du heartbeat passe à `true`. C'est au central de
+déclencher ensuite `ha_restart` au bon moment (l'agent ne le fait pas tout
+seul pour laisser le contrôle de timing à l'admin).
 
 ## Logs et debug
 

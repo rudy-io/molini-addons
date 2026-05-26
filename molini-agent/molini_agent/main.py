@@ -7,11 +7,12 @@ from typing import Any
 import httpx
 
 from .backup import backup_loop
+from .bootstrap import collect_bootstrap_state
 from .commands import poll_and_execute
 from .config import AGENT_VERSION, Config, configure_logging
 from .ha_client import HAClient
 from .metrics import agent_uptime_seconds, collect_metrics
-from .runtime import RUNTIME
+from .runtime import RUNTIME, is_haos
 
 
 configure_logging()
@@ -77,6 +78,15 @@ async def loop(cfg: Config) -> None:
             }
             if ha_version:
                 payload["ha_version"] = ha_version
+
+            # Bootstrap state — exposes mosquitto/z2m/cloudflared install state
+            # + HA config flags so the admin wizard can render its checklist
+            # without having to query each add-on individually.
+            if is_haos():
+                try:
+                    payload["bootstrap_state"] = await collect_bootstrap_state()
+                except Exception as e:
+                    log.warning("bootstrap_state collection failed: %s", e)
 
             ok = await send_heartbeat(cfg, payload)
             log.info(

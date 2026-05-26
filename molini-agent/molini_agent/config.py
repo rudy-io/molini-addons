@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 # Version de l'add-on (figée au build par le Dockerfile via MOLINI_AGENT_VERSION).
 # Pas d'OTA self-update sous HAOS : c'est le mécanisme add-on store qui s'en occupe.
-AGENT_VERSION = os.environ.get("AGENT_VERSION", "0.4.0")
+AGENT_VERSION = os.environ.get("AGENT_VERSION", "0.5.0")
 
 
 @dataclass(frozen=True)

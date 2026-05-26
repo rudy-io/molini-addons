@@ -1,2 +1,3 @@
 httpx>=0.27,<1
 psutil>=5.9,<7
+ruamel.yaml>=0.18,<1

@@ -2,6 +2,7 @@
 
 Mapping des commandes admin vers l'API supervisor HA :
 
+<<<<<<< HEAD
 | Commande         | HAOS impl.                                                     |
 |------------------|----------------------------------------------------------------|
 | backup_now       | tar + age + upload central (chemins /config + /share)          |
@@ -12,6 +13,23 @@ Mapping des commandes admin vers l'API supervisor HA :
 | tunnel_install   | install + configure + start de l'add-on cloudflared            |
 | tunnel_uninstall | stop + uninstall de l'add-on cloudflared                       |
 | ha_provision     | écrit /config/packages/molini_discovered.yaml + reload         |
+| bootstrap_stack  | (chantier A) provisionne broker + z2m + cloudflared + config HA|
+| install_addon    | (chantier A) installe 1 add-on précis (slug white-listé)       |
+| patch_ha_config  | (chantier A) deep-merge YAML configuration.yaml (keys white-listées)|
+=======
+| Commande           | HAOS impl.                                                     |
+|--------------------|----------------------------------------------------------------|
+| backup_now         | tar + age + upload central (chemins /config + /share)          |
+| ha_restart         | POST /core/restart via supervisor                              |
+| agent_restart      | sys.exit(0) — s6 relance le service                            |
+| agent_update       | skipped:managed_by_supervisor (les MAJ passent par store add-on)|
+| stack_update       | itère les add-ons et update si update_available                |
+| tunnel_install     | install + configure + start de l'add-on cloudflared            |
+| tunnel_uninstall   | stop + uninstall de l'add-on cloudflared                       |
+| ha_provision       | écrit /config/packages/molini_discovered.yaml + reload         |
+| rebuild_dashboard  | assemble /config/dashboards/molini.yaml à partir d'une liste   |
+|                    | de blocs + reload Lovelace côté HA                             |
+>>>>>>> night/chantier-E-dashboards-blocks
 """
 import asyncio
 import logging
@@ -22,7 +40,15 @@ import httpx
 
 from . import supervisor_client
 from .backup import run_backup_once
+from .bootstrap import (
+    ALLOWED_ADDON_NAMES,
+    bootstrap_stack,
+    install_or_start_addon,
+    patch_ha_config as bootstrap_patch_ha_config,
+)
 from .config import Config
+from .dashboard_builder import build_and_write
+from .ha_client import HAClient
 from .ha_discovery import execute_ha_provision
 
 log = logging.getLogger("molini_agent.commands")
@@ -241,6 +267,177 @@ async def execute_tunnel_uninstall(
     return {"status": "stopped", "slug": slug}
 
 
+<<<<<<< HEAD
+# ─── Bootstrap commands (chantier A — agent-first onboarding) ─────────────────
+
+async def execute_bootstrap_stack(
+    cfg: Config, payload: dict[str, Any] | None
+) -> dict[str, Any]:
+    """Provisionne toute la stack Moli (Mosquitto + Z2M + cloudflared + patch HA).
+
+    Idempotent : un 2e appel ne ré-installe pas, ne re-patche pas.
+    """
+    return await bootstrap_stack(cfg, payload=payload)
+
+
+async def execute_install_addon(payload: dict[str, Any] | None) -> dict[str, Any]:
+    """Installe un add-on précis depuis la white-list ``ALLOWED_ADDON_NAMES``.
+
+    payload attendu::
+
+        { "name": "mosquitto" | "zigbee2mqtt" | "cloudflared",
+          "options": {...} (optionnel),
+          "start": true (default true) }
+
+    Lève RuntimeError si ``name`` est hors white-list — c'est l'unique mécanisme
+    qui empêche un admin compromis d'installer un add-on arbitraire (un add-on
+    HA peut wrapper du code Python exécuté par le superviseur, donc c'est une
+    surface RCE).
+    """
+    payload = payload or {}
+    name = payload.get("name")
+    if not name or not isinstance(name, str):
+        raise RuntimeError("missing `name` in payload")
+    if name not in ALLOWED_ADDON_NAMES:
+        raise RuntimeError(
+            f"forbidden_addon:{name}: only {sorted(ALLOWED_ADDON_NAMES)} allowed"
+        )
+
+    options = payload.get("options")
+    if options is not None and not isinstance(options, dict):
+        raise RuntimeError("invalid `options` (expected object)")
+
+    start = payload.get("start", True)
+    if not isinstance(start, bool):
+        raise RuntimeError("invalid `start` (expected boolean)")
+
+    return await install_or_start_addon(name, options=options, start=start)
+
+
+async def execute_patch_ha_config(payload: dict[str, Any] | None) -> dict[str, Any]:
+    """Patch idempotent de ``/config/configuration.yaml`` (white-list de clés).
+
+    payload attendu::
+
+        { "config": { "http": { "trusted_proxies": [...] }, "recorder": {...} } }
+
+    La validation des clés top-level passe par ``yaml_patch.PATCHABLE_TOP_KEYS``.
+    Toute clé hors de cette liste fait échouer la commande — protège contre la
+    pose d'``automation:`` ou ``python_script:`` malveillants.
+    """
+    payload = payload or {}
+    cfg_patch = payload.get("config")
+    if not cfg_patch or not isinstance(cfg_patch, dict):
+        raise RuntimeError("missing `config` in payload")
+    return bootstrap_patch_ha_config(cfg_patch)
+=======
+async def _ha_available_entity_ids(cfg: Config) -> set[str] | None:
+    """Liste les entity_id dispo côté HA pour le check des blocs.
+
+    Retourne None si HA est injoignable — le builder skip le check
+    (no-op safe).
+    """
+    ha = HAClient(cfg.ha_url, cfg.ha_token)
+    try:
+        states = await ha.states()
+        if not states:
+            return None
+        return {s.get("entity_id", "") for s in states if s.get("entity_id")}
+    finally:
+        await ha.close()
+
+
+async def execute_rebuild_dashboard(
+    cfg: Config, payload: dict[str, Any] | None
+) -> dict[str, Any]:
+    """Reconstruit /config/dashboards/molini.yaml depuis la liste de blocs.
+
+    Payload attendu : ``{ "blocks": ["_header", "energie", ...] }``
+
+    Étapes :
+    1. Liste les entity_id dispo côté HA pour détecter les blocs avec
+       entités manquantes (warning, pas d'erreur fatale).
+    2. Valide la white-list ``ALLOWED_BLOCKS`` (anti path traversal).
+    3. Charge les partials depuis ``HA_DASHBOARDS_BLOCKS_DIR`` (défaut
+       ``/config/dashboards/blocks``).
+    4. Assemble + écrit atomiquement ``/config/dashboards/molini.yaml``.
+    5. Demande à HA de recharger la conf Lovelace.
+
+    Le chemin de sortie est fixe — pas d'interpolation user.
+    """
+    blocks = (payload or {}).get("blocks")
+    if blocks is None:
+        # Permet à l'admin de retomber sur les defaults en envoyant
+        # un payload vide.
+        blocks = []
+
+    if not isinstance(blocks, list):
+        raise RuntimeError("invalid payload: blocks must be a list")
+
+    available = await _ha_available_entity_ids(cfg)
+
+    # Le builder gère la validation + écriture atomique. Path absolu fixe.
+    blocks_dir = os.environ.get(
+        "MOLINI_DASHBOARD_BLOCKS_DIR", "/config/dashboards/blocks"
+    )
+    output_path = os.environ.get(
+        "MOLINI_DASHBOARD_OUTPUT_PATH", "/config/dashboards/molini.yaml"
+    )
+
+    try:
+        result = build_and_write(
+            blocks=blocks,
+            blocks_dir=blocks_dir,
+            output_path=output_path,
+            available_entity_ids=available,
+        )
+    except (ValueError, FileNotFoundError) as e:
+        # ValueError = slug invalide / hors white-list ; FileNotFoundError
+        # = un fichier .yaml manque sur disque. Les deux remontent en
+        # erreur côté admin (commande failed).
+        raise RuntimeError(f"build failed: {e}") from e
+
+    # Reload Lovelace côté HA — l'endpoint exact dépend de la version.
+    # On essaie le reload via /api/services/lovelace/reload_resources puis
+    # un fallback frontend reload. Si les deux échouent, on log et on
+    # rapporte tout de même le succès du write (le client peut F5 son
+    # dashboard à la main).
+    reload = await _reload_lovelace(cfg)
+    result["reload"] = reload
+    log.info(
+        "rebuild_dashboard ok — blocks=%s changed=%s missing=%s",
+        result.get("blocks_used"),
+        result.get("changed"),
+        list((result.get("missing_entities") or {}).keys()),
+    )
+    return result
+
+
+async def _reload_lovelace(cfg: Config) -> dict[str, Any]:
+    """Demande à HA de recharger la conf Lovelace.
+
+    Note : pour un dashboard en mode YAML, HA recharge automatiquement
+    le fichier au prochain refresh du frontend. On déclenche en plus un
+    reload des resources frontend pour forcer.
+    """
+    headers = {"Authorization": f"Bearer {cfg.ha_token}"}
+    results: dict[str, Any] = {}
+    async with httpx.AsyncClient(timeout=15) as client:
+        for service, endpoint in (
+            ("lovelace.reload_resources", "/api/services/lovelace/reload_resources"),
+            ("frontend.reload_themes", "/api/services/frontend/reload_themes"),
+        ):
+            try:
+                r = await client.post(
+                    f"{cfg.ha_url}{endpoint}", headers=headers, json={}
+                )
+                results[service] = r.status_code
+            except httpx.HTTPError as e:
+                results[service] = f"err: {e}"
+    return results
+>>>>>>> night/chantier-E-dashboards-blocks
+
+
 # ─── Dispatcher ───────────────────────────────────────────────────────────────
 
 HANDLERS = {
@@ -252,6 +449,13 @@ HANDLERS = {
     "tunnel_install": lambda cfg, payload: execute_tunnel_install(payload),
     "tunnel_uninstall": lambda cfg, payload: execute_tunnel_uninstall(payload),
     "ha_provision": lambda cfg, payload: execute_ha_provision(cfg),
+<<<<<<< HEAD
+    "bootstrap_stack": lambda cfg, payload: execute_bootstrap_stack(cfg, payload),
+    "install_addon": lambda cfg, payload: execute_install_addon(payload),
+    "patch_ha_config": lambda cfg, payload: execute_patch_ha_config(payload),
+=======
+    "rebuild_dashboard": lambda cfg, payload: execute_rebuild_dashboard(cfg, payload),
+>>>>>>> night/chantier-E-dashboards-blocks
 }
 
 

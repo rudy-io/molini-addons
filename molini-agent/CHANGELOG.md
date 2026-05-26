@@ -1,5 +1,80 @@
 # Changelog
 
+## 0.5.0 — 2026-05-25 (chantier A — agent-first onboarding)
+
+Première itération post-pilote Carole (25/05/2026). L'installateur ne fait
+plus que (1) brancher la box et (2) installer l'add-on Moli Agent avec son
+client token. **Tout le reste** (broker Mosquitto, Z2M, cloudflared, patch HA
+`trusted_proxies` + `recorder.purge_keep_days`) est provisionné automatiquement
+par l'agent dès que le central enqueue `bootstrap_stack`.
+
+### Ajouts
+
+- **Module `bootstrap.py`** : orchestre l'installation idempotente de la stack
+  Moli via l'API supervisor. Retourne un rapport structuré (`actions[]`,
+  `ha_config_patch`, `ha_restart_pending`, `errors[]`, `summary`).
+- **Module `yaml_patch.py`** : patch idempotent deep-merge de
+  `/config/configuration.yaml` via ruamel.yaml (round-trip, commentaires
+  préservés). Inclut une **white-list stricte** des clés top-level patchables
+  (`http`, `recorder`, `frontend`, `logger`, ...) — `python_script`, `shell_command`,
+  `automation`, etc. sont volontairement **non patchables** (surface RCE).
+- **Nouvelles commandes admin** (côté agent + enum central) :
+  - `bootstrap_stack` — provisionne broker + z2m + cloudflared (sans démarrage,
+    en attente du token) + patch `trusted_proxies` + `purge_keep_days`. Idempotent.
+  - `install_addon` — installe un add-on précis depuis la white-list
+    `{mosquitto, zigbee2mqtt, cloudflared}` avec options optionnelles.
+  - `patch_ha_config` — patch deep-merge `configuration.yaml` avec validation
+    white-list. Lève sur clé interdite.
+- **Heartbeat enrichi** : nouveau champ `bootstrap_state` (sous HAOS uniquement)
+  exposant `mosquitto/zigbee2mqtt/cloudflared` (state ou `not_installed`),
+  `trusted_proxies_ok` (bool), `purge_keep_days_ok` (bool), `ha_restart_pending`
+  (bool). Le central l'utilise pour le wizard d'install (chantier B).
+- **Côté central `site/`** :
+  - Enum `commandTypeEnum` (Drizzle) étendu avec les 3 nouveaux types.
+  - `CommandsPanel` UI : nouveaux boutons "Bootstrap auto", "Install add-on",
+    "Patch config HA" (super_admin only pour les 2 derniers).
+  - Endpoint `/api/admin/clients/[id]/commands` valide le payload via Zod
+    avec schémas dédiés (slug white-list, config white-list).
+- **Slug add-ons figés** :
+  - Mosquitto → `core_mosquitto` (slug exact officiel HA)
+  - Z2M → `45df7312_zigbee2mqtt` (slug officiel community repo hash)
+    avec fallback pattern `*_zigbee2mqtt`
+  - Cloudflared → résolu dynamiquement (pattern `*_cloudflared`), repo
+    `https://github.com/brenner-tobias/ha-addons` ajouté à la volée si
+    nécessaire, polling `/store/addons` toutes les 2 s pendant 60 s max.
+- **Helpers supervisor** : ajout de `store_addons_list()` et `store_info()`
+  pour le polling du catalogue store post ajout repo.
+
+### Modifications
+
+- `requirements.txt` : ajout `ruamel.yaml>=0.18,<1` (parseur YAML round-trip).
+- `config.yaml`, `Dockerfile`, `config.py` : version bumpée à `0.5.0`.
+
+### Sécurité
+
+- **White-list slugs** : `install_addon` rejette tout slug hors
+  `{mosquitto, zigbee2mqtt, cloudflared}` côté agent **et** côté API admin
+  (deux barrières).
+- **White-list clés YAML** : `patch_ha_config` rejette toute clé top-level hors
+  `PATCHABLE_TOP_KEYS` (=`{http, recorder, frontend, logger, ...}`). Les clés
+  qui peuvent exécuter du code (`python_script`, `shell_command`, `automation`,
+  `homeassistant.allow_*`, `command_line`, etc.) sont volontairement absentes.
+- **Idempotence** : un même `bootstrap_stack` joué 2x = 0 modification au 2e
+  passage (les pruning de patch retournent `changed: False`).
+- **Pas de logs de secrets** : les tokens (client_token, tunnel_token, age
+  recipient) ne sont jamais loggés en clair — tronqués à 14 chars max.
+
+### Limitations connues
+
+- Pas encore d'icône `icon.png` / `logo.png` (l'add-on s'affiche avec
+  l'icône par défaut HA).
+- Le slug Z2M `45df7312_zigbee2mqtt` dépend du hash du repo officiel — si HA
+  change ce hash, le fallback pattern reste valide.
+- Le HA restart (nécessaire après patch `http`/`recorder`) **n'est pas** déclenché
+  automatiquement par `bootstrap_stack` — le rapport flag `ha_restart_pending`
+  et c'est au central de déclencher `ha_restart` ensuite (laisse à l'admin le
+  contrôle du timing — un restart coupe ~30s la box).
+
 ## 0.4.0 — 2026-04-26 (initial HAOS port)
 
 Première version add-on Home Assistant OS, dérivée de l'agent Python
