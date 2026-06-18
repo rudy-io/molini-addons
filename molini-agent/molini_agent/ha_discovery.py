@@ -5,11 +5,18 @@ Sous HAOS, le path d'écriture est ``/config/packages/molini_discovered.yaml``
 dans ``config.yaml``). Le reload se fait via l'API HA Core (templates +
 core config), accessible au travers du proxy supervisor avec
 ``SUPERVISOR_TOKEN``.
+
+Certains rôles (production solaire) sont **multi-sources** : une installation
+peut mélanger plusieurs marques d'onduleurs (SolarMan ``inverter*``, IzyPower
+``*puissance_pv``, Enphase, Huawei…) sur des groupes de panneaux distincts. Pour
+ces rôles, le sensor ``molini_*`` est la **somme** de toutes les entités
+détectées. On privilégie la puissance DC (``pv_power``) pour rester homogène
+entre marques (l'AC n'est pas exposé par tous les clouds, ex. IzyPower).
 """
 import logging
 import os
 import re
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import httpx
 
@@ -20,14 +27,29 @@ log = logging.getLogger("molini_agent.ha_discovery")
 
 # ─── Patterns par rôle MOLINI ────────────────────────────────────
 PATTERNS: dict[str, list[str]] = {
+    # Consommation réelle de la maison — nécessite une vraie mesure : Linky en
+    # TIC *standard* (SINSTS = puissance soutirée), ou un compteur dédié type
+    # Shelly EM. NB : izypower "consommation" est VOLONTAIREMENT exclu — il vaut
+    # = prod PV (autoconso supposée 100 %), ce n'est pas une vraie conso maison.
+    "conso_power": [
+        r"^sensor\.(?:linky|zlinky|sonde_linky)[\w_]*sinsts$",
+        r"^sensor\.[\w_]*puissance_soutiree[\w_]*$",
+        r"^sensor\.[\w_]*shelly[\w_]*_power$",
+    ],
+    # Puissance soutirée réseau (Linky) — papp (TIC historique) ou sinsts (standard)
     "linky_power": [
+        r"^sensor\.(?:linky|sonde_linky|zlinky)[\w_]*sinsts$",
         r"^sensor\.(?:linky|sonde_linky|zlinky)[\w_]*(?:papp|puissance_apparente)$",
     ],
     "linky_hc": [
         r"^sensor\.(?:linky|sonde_linky|zlinky)[\w_]*(?:hchc|index_hchc)$",
+        r"^sensor\.(?:lixee_)?zlinky[\w_]*consommation_partie_1$",
+        r"^sensor\.(?:linky|zlinky)[\w_]*easf01$",
     ],
     "linky_hp": [
         r"^sensor\.(?:linky|sonde_linky|zlinky)[\w_]*(?:hchp|index_hchp)$",
+        r"^sensor\.(?:lixee_)?zlinky[\w_]*consommation_partie_2$",
+        r"^sensor\.(?:linky|zlinky)[\w_]*easf02$",
     ],
     "tempo_today": [
         r"^sensor\.rte_tempo_couleur_(?:actuelle|du_jour)$",
@@ -37,21 +59,49 @@ PATTERNS: dict[str, list[str]] = {
         r"^sensor\.rte_tempo_(?:prochaine_couleur|couleur_demain)$",
         r"^sensor\.tempo_tomorrow$",
     ],
+    # Production solaire instantanée — DC, sommée sur TOUS les onduleurs détectés.
     "solar_power": [
+        r"^sensor\.inverter(?:_\d+)?_pv_power$",
+        r"^sensor\.izypower[\w_]*_puissance_pv$",
         r"^sensor\.envoy[\w_]*current[\w_]*power[\w_]*production[\w_]*$",
         r"^sensor\.envoy_production$",
         r"^sensor\.huawei_solar[\w_]*input_power$",
-        r"^sensor\.solaredge[\w_]*ac_power$",
-        r"^sensor\.solarman[\w_]*power[\w_]*$",
+        r"^sensor\.solaredge[\w_]*dc_power$",
+        r"^sensor\.solarman[\w_]*pv[\w_]*power$",
     ],
     "solar_energy_today": [
+        r"^sensor\.inverter(?:_\d+)?_today_production$",
+        r"^sensor\.izypower[\w_]*_production_jour$",
         r"^sensor\.envoy[\w_]*today[\w_]*production[\w_]*$",
         r"^sensor\.envoy_energy_today$",
         r"^sensor\.huawei_solar[\w_]*daily_yield$",
         r"^sensor\.solaredge[\w_]*energy_today$",
         r"^sensor\.solarman[\w_]*daily_production$",
     ],
+    "solar_energy_total": [
+        r"^sensor\.inverter(?:_\d+)?_total_production$",
+        r"^sensor\.envoy[\w_]*lifetime[\w_]*production[\w_]*$",
+        r"^sensor\.huawei_solar[\w_]*total_yield$",
+        r"^sensor\.solaredge[\w_]*lifetime_energy$",
+        r"^sensor\.solarman[\w_]*total_production$",
+    ],
 }
+
+# Rôles dont la valeur est la SOMME de toutes les entités détectées (multi-onduleurs).
+MULTI_SUM_ROLES: frozenset[str] = frozenset(
+    {"solar_power", "solar_energy_today", "solar_energy_total"}
+)
+
+# Au-delà de ce seuil, un index est considéré exprimé en Wh → converti en kWh.
+# Un index résidentiel en kWh ne dépasse jamais ~1e6 (= 1 GWh) ; en Wh il
+# l'atteint vite. Évite de diviser à tort un index Zlinky déjà en kWh (ex 33450).
+WH_TO_KWH_THRESHOLD = 1_000_000
+
+_DEAD_STATES = ("unknown", "unavailable", "none", None, "")
+
+
+def _is_live(state: Any) -> bool:
+    return state not in _DEAD_STATES
 
 
 def _find_entity(
@@ -60,26 +110,48 @@ def _find_entity(
     for pat in patterns:
         rx = re.compile(pat, re.IGNORECASE)
         for s in states:
-            eid = s.get("entity_id", "")
-            state = s.get("state", "")
-            if state in ("unknown", "unavailable", "none", None, ""):
+            if not _is_live(s.get("state")):
                 continue
-            if rx.match(eid):
-                return eid
+            if rx.match(s.get("entity_id", "")):
+                return s["entity_id"]
     return None
 
 
-async def discover_entities(ha: HAClient) -> dict[str, str]:
+def _find_all_entities(
+    states: list[dict[str, Any]], patterns: list[str]
+) -> list[str]:
+    """Toutes les entités vivantes matchant un pattern (dédupliquées, ordre stable)."""
+    found: list[str] = []
+    seen: set[str] = set()
+    for pat in patterns:
+        rx = re.compile(pat, re.IGNORECASE)
+        for s in states:
+            eid = s.get("entity_id", "")
+            if eid in seen or not _is_live(s.get("state")):
+                continue
+            if rx.match(eid):
+                seen.add(eid)
+                found.append(eid)
+    return found
+
+
+async def discover_entities(ha: HAClient) -> dict[str, Union[str, list[str]]]:
     states = await ha.states()
     if not states:
         log.warning("ha_discovery: /api/states vide")
         return {}
-    found: dict[str, str] = {}
+    found: dict[str, Union[str, list[str]]] = {}
     for role, patterns in PATTERNS.items():
-        eid = _find_entity(states, patterns)
-        if eid:
-            found[role] = eid
-            log.info("ha_discovery: %s → %s", role, eid)
+        if role in MULTI_SUM_ROLES:
+            eids = _find_all_entities(states, patterns)
+            if eids:
+                found[role] = eids
+                log.info("ha_discovery: %s → %s (somme de %d)", role, ", ".join(eids), len(eids))
+        else:
+            eid = _find_entity(states, patterns)
+            if eid:
+                found[role] = eid
+                log.info("ha_discovery: %s → %s", role, eid)
     return found
 
 
@@ -87,15 +159,21 @@ def _yaml_quote(s: str) -> str:
     return s.replace("'", "''")
 
 
-def generate_yaml(detected: dict[str, str]) -> str:
+def _states(eid: str) -> str:
+    return "states('" + eid + "')"
+
+
+def generate_yaml(detected: dict[str, Union[str, list[str]]]) -> str:
     role_specs: dict[str, tuple[str, str, Optional[str], Optional[str], Optional[str]]] = {
-        "linky_power": ("MOLINI Puissance Linky", "molini_power_w", "W", "power", "measurement"),
+        "conso_power": ("MOLINI Consommation maison", "molini_conso_power_w", "W", "power", "measurement"),
+        "linky_power": ("MOLINI Puissance soutirée", "molini_power_w", "W", "power", "measurement"),
         "linky_hc": ("MOLINI Index HC", "molini_index_hc", "kWh", "energy", "total_increasing"),
         "linky_hp": ("MOLINI Index HP", "molini_index_hp", "kWh", "energy", "total_increasing"),
         "tempo_today": ("MOLINI Tempo aujourd'hui", "molini_tempo_today", None, None, None),
         "tempo_tomorrow": ("MOLINI Tempo demain", "molini_tempo_tomorrow", None, None, None),
         "solar_power": ("MOLINI Solaire production", "molini_solar_power_w", "W", "power", "measurement"),
         "solar_energy_today": ("MOLINI Solaire production aujourd'hui", "molini_solar_energy_today", "kWh", "energy", "total_increasing"),
+        "solar_energy_total": ("MOLINI Solaire production totale", "molini_solar_energy_total", "kWh", "energy", "total_increasing"),
     }
 
     out: list[str] = [
@@ -112,28 +190,40 @@ def generate_yaml(detected: dict[str, str]) -> str:
         if not spec:
             continue
         name, uid, unit, dc, sc = spec
-        out.append(f"      - name: '{_yaml_quote(name)}'")
-        out.append(f"        unique_id: {uid}")
+        eids = eid if isinstance(eid, list) else [eid]
+        if not eids:
+            continue
+
+        out.append("      - name: '" + _yaml_quote(name) + "'")
+        out.append("        unique_id: " + uid)
         if unit:
-            out.append(f'        unit_of_measurement: "{unit}"')
+            out.append('        unit_of_measurement: "' + unit + '"')
         if dc:
-            out.append(f"        device_class: {dc}")
+            out.append("        device_class: " + dc)
         if sc:
-            out.append(f"        state_class: {sc}")
-        if role in ("linky_hc", "linky_hp"):
+            out.append("        state_class: " + sc)
+
+        if role in MULTI_SUM_ROLES:
+            terms = " + ".join("(" + _states(e) + " | float(0))" for e in eids)
+            out.append('        state: "{{ ' + terms + ' }}"')
+        elif role in ("linky_hc", "linky_hp"):
+            e = eids[0]
             out.append(
                 "        state: >\n"
-                f"          {{% set v = states('{eid}') | float(0) %}}\n"
-                "          {{ (v / 1000) if v > 10000 else v }}"
+                "          {% set v = " + _states(e) + " | float(0) %}\n"
+                "          {{ (v / 1000) if v > " + str(WH_TO_KWH_THRESHOLD) + " else v }}"
             )
         elif role in ("tempo_today", "tempo_tomorrow"):
-            out.append(
-                "        state: >\n"
-                f"          {{{{ states('{eid}') | upper }}}}"
-            )
+            e = eids[0]
+            out.append("        state: >\n          {{ " + _states(e) + " | upper }}")
         else:
-            out.append(f'        state: "{{{{ states(\'{eid}\') }}}}"')
-        out.append(f'        availability: "{{{{ states(\'{eid}\') not in [\\"unknown\\",\\"unavailable\\",\\"none\\"] }}}}"')
+            e = eids[0]
+            out.append('        state: "{{ ' + _states(e) + ' }}"')
+
+        av = " or ".join(
+            _states(e) + " not in ['unknown', 'unavailable', 'none']" for e in eids
+        )
+        out.append('        availability: "{{ ' + av + ' }}"')
         out.append("")
 
     return "\n".join(out) + "\n"
@@ -184,7 +274,7 @@ async def execute_ha_provision(cfg) -> dict[str, Any]:
             f.write(yaml_content)
         os.replace(tmp_path, target_path)
         log.info(
-            "ha_discovery: %s écrit (%d entités)",
+            "ha_discovery: %s écrit (%d rôles)",
             target_path,
             len(detected),
         )
