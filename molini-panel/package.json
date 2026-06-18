@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "vite --port 5177 --strictPort",
     "build": "vite build --mode lib",
+    "copy:addon": "node scripts/copy-addon.mjs",
+    "build:addon": "vite build --mode lib && node scripts/copy-addon.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
