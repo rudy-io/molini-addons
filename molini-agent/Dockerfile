@@ -3,8 +3,11 @@
 ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
-# Métadonnées de version reportées au central (override possible via env).
-ARG MOLINI_AGENT_VERSION=0.5.0
+# Métadonnées de version reportées au central. Le superviseur HA injecte
+# BUILD_VERSION (= version de config.yaml) comme build-arg ; on s'en sert pour
+# que AGENT_VERSION reflète la vraie version (sinon le heartbeat reste figé).
+ARG BUILD_VERSION
+ARG MOLINI_AGENT_VERSION=${BUILD_VERSION:-0.5.2}
 ENV MOLINI_AGENT_VERSION=${MOLINI_AGENT_VERSION} \
     AGENT_VERSION=${MOLINI_AGENT_VERSION} \
     PYTHONUNBUFFERED=1 \

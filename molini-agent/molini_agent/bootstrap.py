@@ -260,7 +260,14 @@ async def install_or_start_addon(
         log.info("bootstrap: addon_info(%s) failed → %s", slug, e)
         info = {}
 
-    is_installed = bool(info.get("version_installed") or info.get("installed"))
+    # Le Supervisor expose la version installée sous ``version`` (et non
+    # ``version_installed``). De plus, ``resolve_addon_slug`` a déjà confirmé la
+    # présence quand l'add-on figurait dans /addons (source "installed_*"). Sans
+    # ce double check, un add-on déjà installé repartait en addon_install → 400
+    # "already_installed" → faux "failed" dans le wizard.
+    is_installed = source.startswith("installed") or bool(
+        info.get("version") or info.get("version_installed") or info.get("installed")
+    )
     current_state = info.get("state", "unknown")
 
     options_applied = False

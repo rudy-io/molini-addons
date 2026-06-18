@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.2 — 2026-06-18 (fixes wizard install + versioning)
+
+- **install_addon idempotent** : `install_or_start_addon` détectait mal un add-on
+  déjà installé (lisait `version_installed`/`installed` au lieu de `version`, et
+  ignorait `source="installed_*"`) → il relançait l'install → 400
+  `already_installed` → faux `failed` dans le wizard. Corrigé.
+- **Versioning** : le `Dockerfile` lit désormais `BUILD_VERSION` (injecté par le
+  superviseur au build) au lieu d'un `0.5.0` figé → le heartbeat rapporte la vraie version.
+
 ## 0.5.1 — 2026-06-18 (hotfix — conflits de merge 0.5.0 non résolus)
 
 La 0.5.0 avait été publiée avec 4 conflits de merge git restés dans le code
