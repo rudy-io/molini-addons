@@ -32,3 +32,20 @@ def test_label_for_inverter():
 def test_label_for_izypower():
     lbl = pd.inverter_label("sensor.izypower_cloud_maison_35486_55180000aa2e", 2)
     assert lbl == "Micro-onduleur 3"
+
+def test_build_cards_structure():
+    cards = pd.build_panel_cards(CAROLE)
+    # 1 heading + 1 grid par onduleur (4 détectés : 2 SolarMan + 2 IzyPower)
+    headings = [c for c in cards if c.get("type") == "heading"]
+    grids = [c for c in cards if c.get("type") == "grid"]
+    assert len(headings) == 4 and len(grids) == 4
+    # chaque grid contient des gauge référençant les entity_id réels
+    first_grid = grids[0]
+    assert all(g["type"] == "gauge" for g in first_grid["cards"])
+    assert first_grid["cards"][0]["entity"].startswith("sensor.")
+    # gauge bornée et en W
+    assert first_grid["cards"][0]["max"] == 600
+    assert first_grid["cards"][0]["unit"] == "W"
+
+def test_build_cards_empty():
+    assert pd.build_panel_cards({"sensor.x"}) == []

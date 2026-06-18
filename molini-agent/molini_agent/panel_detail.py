@@ -34,3 +34,31 @@ def inverter_label(prefix: str, index: int) -> str:
     if "izypower" in prefix.lower() or "micro" in prefix.lower():
         return f"Micro-onduleur {index + 1}"
     return f"Onduleur {index + 1}"
+
+
+PANEL_MAX_W = 600  # borne haute d'un panneau résidentiel (~400-500 W crête)
+
+
+def build_panel_cards(entity_ids: set[str]) -> list[dict[str, Any]]:
+    """Cartes Lovelace natives du détail par panneau. [] si aucun PV détecté."""
+    groups = detect_panels(entity_ids)
+    if not groups:
+        return []
+    cards: list[dict[str, Any]] = []
+    for index, (prefix, eids) in enumerate(sorted(groups.items())):
+        cards.append({
+            "type": "heading",
+            "heading": inverter_label(prefix, index),
+            "heading_style": "subtitle",
+        })
+        cards.append({
+            "type": "grid",
+            "columns": 4,
+            "square": False,
+            "cards": [
+                {"type": "gauge", "entity": eid, "name": f"P{i + 1}",
+                 "min": 0, "max": PANEL_MAX_W, "unit": "W", "needle": True}
+                for i, eid in enumerate(eids)
+            ],
+        })
+    return cards
