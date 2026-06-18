@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.6.0 — 2026-06-18 (dashboard énergie générique)
+
+- **Dashboard Lovelace modulaire opérationnel** : les blocs (`energie`, `_header`,
+  `aide`, `_reglages`) sont packagés dans l'add-on et déposés sur la box au
+  démarrage (`/config/dashboards/blocks/`) — ce qui débloque `rebuild_dashboard`
+  (les fichiers de blocs n'étaient packagés nulle part avant, d'où le « Block
+  file not found »).
+- **Découverte multi-onduleurs** : `molini_solar_power_w` somme tous les onduleurs
+  détectés (SolarMan `inverter*` + IzyPower `*puissance_pv` + Enphase/Huawei/
+  SolarEdge), en DC homogène. Nouveaux capteurs `molini_solar_energy_total`,
+  `molini_conso_power_w`. Index Linky reconnus depuis Zlinky `consommation_partie_*`.
+- Page **Énergie** : production solaire (jauge + total + historique 24 h) + index
+  compteur ; consommation / réseau / Tempo annoncés « à venir » (Linky TIC standard).
+
 ## 0.5.2 — 2026-06-18 (fixes wizard install + versioning)
 
 - **install_addon idempotent** : `install_or_start_addon` détectait mal un add-on

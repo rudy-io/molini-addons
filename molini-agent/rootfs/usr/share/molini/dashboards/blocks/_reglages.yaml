@@ -1,0 +1,12 @@
+title: Réglages
+path: reglages
+icon: mdi:cog
+cards:
+  - type: markdown
+    content: >
+      ## Réglages
+
+
+      Les paramètres techniques de votre box (broker, passerelle, sauvegardes)
+      sont gérés automatiquement par Moli. Cette page accueillera bientôt vos
+      préférences (notifications, scénarios, accès famille).

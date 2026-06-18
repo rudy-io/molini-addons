@@ -1,0 +1,12 @@
+title: Aide
+path: aide
+icon: mdi:lifebuoy
+cards:
+  - type: markdown
+    content: >
+      ## Besoin d'un coup de main ?
+
+
+      Votre installation est maintenue par **Moli**. Pour toute question ou
+      intervention, écrivez-nous à **contact@moli.energy** — on s'occupe de tout,
+      à distance la plupart du temps.

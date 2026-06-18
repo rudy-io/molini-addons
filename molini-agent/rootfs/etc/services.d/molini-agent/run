@@ -63,6 +63,22 @@ export MOLINI_LOG_LEVEL="${PY_LOG_LEVEL}"
 export HA_PACKAGES_DIR="/config/packages"
 mkdir -p "${HA_PACKAGES_DIR}"
 
+# ─── Déploiement des blocs de dashboard packagés ─────────────────────────────
+# Les blocs Lovelace Moli sont embarqués dans l'image (/usr/share/molini/...) et
+# copiés vers /config/dashboards/blocks pour que la commande rebuild_dashboard
+# puisse les assembler. Écrasés à chaque démarrage = toujours à jour (gérés par
+# Moli, pas censés être édités à la main).
+BLOCKS_SRC="/usr/share/molini/dashboards/blocks"
+BLOCKS_DST="/config/dashboards/blocks"
+if [ -d "${BLOCKS_SRC}" ]; then
+  mkdir -p "${BLOCKS_DST}"
+  if cp -f "${BLOCKS_SRC}"/*.yaml "${BLOCKS_DST}"/ 2>/dev/null; then
+    bashio::log.info "Blocs dashboard déployés → ${BLOCKS_DST}"
+  else
+    bashio::log.warning "Aucun bloc dashboard à déployer depuis ${BLOCKS_SRC}"
+  fi
+fi
+
 bashio::log.info "Moli Agent ${AGENT_VERSION} starting — central=${CENTRAL_URL} interval=${HEARTBEAT_INTERVAL_S}s runtime=${MOLINI_RUNTIME}"
 
 cd /app

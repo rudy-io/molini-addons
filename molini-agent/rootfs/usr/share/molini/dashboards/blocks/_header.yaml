@@ -1,0 +1,11 @@
+title: Accueil
+path: accueil
+icon: mdi:home
+cards:
+  - type: markdown
+    content: >
+      # Bienvenue chez Moli
+
+
+      Votre maison, pilotée simplement. Retrouvez votre production solaire dans
+      l'onglet **Énergie**, et votre aide dans l'onglet **Aide**.
