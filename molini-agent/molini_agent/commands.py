@@ -2,7 +2,6 @@
 
 Mapping des commandes admin vers l'API supervisor HA :
 
-<<<<<<< HEAD
 | Commande         | HAOS impl.                                                     |
 |------------------|----------------------------------------------------------------|
 | backup_now       | tar + age + upload central (chemins /config + /share)          |
@@ -16,20 +15,7 @@ Mapping des commandes admin vers l'API supervisor HA :
 | bootstrap_stack  | (chantier A) provisionne broker + z2m + cloudflared + config HA|
 | install_addon    | (chantier A) installe 1 add-on précis (slug white-listé)       |
 | patch_ha_config  | (chantier A) deep-merge YAML configuration.yaml (keys white-listées)|
-=======
-| Commande           | HAOS impl.                                                     |
-|--------------------|----------------------------------------------------------------|
-| backup_now         | tar + age + upload central (chemins /config + /share)          |
-| ha_restart         | POST /core/restart via supervisor                              |
-| agent_restart      | sys.exit(0) — s6 relance le service                            |
-| agent_update       | skipped:managed_by_supervisor (les MAJ passent par store add-on)|
-| stack_update       | itère les add-ons et update si update_available                |
-| tunnel_install     | install + configure + start de l'add-on cloudflared            |
-| tunnel_uninstall   | stop + uninstall de l'add-on cloudflared                       |
-| ha_provision       | écrit /config/packages/molini_discovered.yaml + reload         |
-| rebuild_dashboard  | assemble /config/dashboards/molini.yaml à partir d'une liste   |
-|                    | de blocs + reload Lovelace côté HA                             |
->>>>>>> night/chantier-E-dashboards-blocks
+| rebuild_dashboard| (chantier E) assemble dashboards/molini.yaml + reload Lovelace |
 """
 import asyncio
 import logging
@@ -267,7 +253,6 @@ async def execute_tunnel_uninstall(
     return {"status": "stopped", "slug": slug}
 
 
-<<<<<<< HEAD
 # ─── Bootstrap commands (chantier A — agent-first onboarding) ─────────────────
 
 async def execute_bootstrap_stack(
@@ -330,7 +315,6 @@ async def execute_patch_ha_config(payload: dict[str, Any] | None) -> dict[str, A
     if not cfg_patch or not isinstance(cfg_patch, dict):
         raise RuntimeError("missing `config` in payload")
     return bootstrap_patch_ha_config(cfg_patch)
-=======
 async def _ha_available_entity_ids(cfg: Config) -> set[str] | None:
     """Liste les entity_id dispo côté HA pour le check des blocs.
 
@@ -435,7 +419,6 @@ async def _reload_lovelace(cfg: Config) -> dict[str, Any]:
             except httpx.HTTPError as e:
                 results[service] = f"err: {e}"
     return results
->>>>>>> night/chantier-E-dashboards-blocks
 
 
 # ─── Dispatcher ───────────────────────────────────────────────────────────────
@@ -449,13 +432,10 @@ HANDLERS = {
     "tunnel_install": lambda cfg, payload: execute_tunnel_install(payload),
     "tunnel_uninstall": lambda cfg, payload: execute_tunnel_uninstall(payload),
     "ha_provision": lambda cfg, payload: execute_ha_provision(cfg),
-<<<<<<< HEAD
     "bootstrap_stack": lambda cfg, payload: execute_bootstrap_stack(cfg, payload),
     "install_addon": lambda cfg, payload: execute_install_addon(payload),
     "patch_ha_config": lambda cfg, payload: execute_patch_ha_config(payload),
-=======
     "rebuild_dashboard": lambda cfg, payload: execute_rebuild_dashboard(cfg, payload),
->>>>>>> night/chantier-E-dashboards-blocks
 }
 
 

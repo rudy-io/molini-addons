@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.1 — 2026-06-18 (hotfix — conflits de merge 0.5.0 non résolus)
+
+La 0.5.0 avait été publiée avec 4 conflits de merge git restés dans le code
+(`commands.py` ×3, `tests/conftest.py` ×1), entre le chantier A (bootstrap_stack
+/ install_addon / patch_ha_config) et le chantier E (rebuild_dashboard) →
+SyntaxError → l'agent crashait au démarrage sur toute box passée en 0.5.0.
+Conflits résolus en **union** (les deux chantiers sont complémentaires, aucune
+fonction commune). Aucun changement de logique. Validé : py_compile, import,
+34 tests bootstrap/security verts.
+
 ## 0.5.0 — 2026-05-25 (chantier A — agent-first onboarding)
 
 Première itération post-pilote Carole (25/05/2026). L'installateur ne fait
