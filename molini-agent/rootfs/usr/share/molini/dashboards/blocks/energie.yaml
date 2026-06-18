@@ -8,7 +8,7 @@ cards:
     icon: mdi:solar-power
 
   - type: gauge
-    entity: sensor.molini_solar_power_w
+    entity: sensor.molini_solaire_production
     name: Production en ce moment
     needle: true
     min: 0
@@ -25,18 +25,18 @@ cards:
     columns: 3
     show_state: true
     entities:
-      - entity: sensor.molini_solar_power_w
+      - entity: sensor.molini_solaire_production
         name: Maintenant
-      - entity: sensor.molini_solar_energy_today
+      - entity: sensor.molini_solaire_production_aujourd_hui
         name: Aujourd'hui
-      - entity: sensor.molini_solar_energy_total
+      - entity: sensor.molini_solaire_production_totale
         name: Depuis l'origine
 
   - type: history-graph
     title: Production des dernières 24 h
     hours_to_show: 24
     entities:
-      - entity: sensor.molini_solar_power_w
+      - entity: sensor.molini_solaire_production
         name: Production
 
   - type: entities

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.1 — 2026-06-18 (fix entity_id dashboard énergie)
+
+- La page Énergie référençait les `unique_id` (`molini_solar_power_w`…), mais HA
+  dérive l'`entity_id` d'un template sensor de son `name` (slug). Les vraies
+  entités sont donc `sensor.molini_solaire_production` / `_aujourd_hui` /
+  `_totale`. Le bloc `energie.yaml` pointe désormais dessus. (Les index Linky
+  marchaient déjà, leur slug coïncidant avec l'unique_id.)
+
 ## 0.6.0 — 2026-06-18 (dashboard énergie générique)
 
 - **Dashboard Lovelace modulaire opérationnel** : les blocs (`energie`, `_header`,
