@@ -83,6 +83,23 @@ DEFAULT_BLOCKS_DIR = os.environ.get(
 # au cas où la white-list serait étendue plus tard.
 _SLUG_RE = re.compile(r"^[a-z_][a-z0-9_]*$")
 
+# ─── Marqueur de cartes dynamiques ───────────────────────────────────────────
+PANEL_MARKER = "MOLINI_PANELS"
+
+
+def _inject_dynamic_cards(view: dict, cards: list[dict]) -> None:
+    """Remplace, dans view['cards'], la carte-marqueur MOLINI_PANELS par `cards`."""
+    existing = view.get("cards")
+    if not isinstance(existing, list):
+        return
+    out = []
+    for c in existing:
+        if isinstance(c, dict) and c.get("type") == "markdown" and c.get("content") == PANEL_MARKER:
+            out.extend(cards)
+        else:
+            out.append(c)
+    view["cards"] = out
+
 
 @dataclass(frozen=True)
 class BuildResult:
@@ -222,6 +239,7 @@ def build_yaml(
     blocks: Iterable[str],
     blocks_dir: str | os.PathLike[str] | None = None,
     available_entity_ids: set[str] | None = None,
+    dynamic_cards: dict[str, list[dict[str, Any]]] | None = None,
 ) -> BuildResult:
     """Assemble la liste de blocs en un dashboard Lovelace complet.
 
@@ -255,6 +273,8 @@ def build_yaml(
 
     for slug in validated:
         block = _load_block(bdir, slug)
+        if dynamic_cards and slug in dynamic_cards:
+            _inject_dynamic_cards(block, dynamic_cards[slug])
         miss = check_missing_entities(block, available_entity_ids)
         if miss:
             log.warning(
@@ -317,13 +337,14 @@ def build_and_write(
     blocks_dir: str | os.PathLike[str] | None = None,
     output_path: str | os.PathLike[str] = DEFAULT_OUTPUT_PATH,
     available_entity_ids: set[str] | None = None,
+    dynamic_cards: dict[str, list[dict[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     """Pipeline complet : validate → build → write atomic.
 
     Utilisé par le handler ``rebuild_dashboard`` de l'agent. Renvoie un
     dict sérialisable pour le résultat de la commande admin.
     """
-    result = build_yaml(blocks, blocks_dir=blocks_dir, available_entity_ids=available_entity_ids)
+    result = build_yaml(blocks, blocks_dir=blocks_dir, available_entity_ids=available_entity_ids, dynamic_cards=dynamic_cards)
     changed = write_yaml_atomic(result.yaml_text, output_path)
     return {
         "ok": True,

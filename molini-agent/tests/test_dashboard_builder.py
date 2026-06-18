@@ -357,3 +357,22 @@ def test_assembled_yaml_is_valid_lovelace():
     for view in data["views"]:
         assert "title" in view
         assert "cards" in view
+
+
+import io
+from ruamel.yaml import YAML
+from molini_agent import dashboard_builder as db
+
+def test_dynamic_cards_replace_marker(tmp_path):
+    blocks_dir = tmp_path / "blocks"
+    blocks_dir.mkdir()
+    (blocks_dir / "energie.yaml").write_text(
+        "title: Énergie\npath: energie\ncards:\n"
+        "  - type: markdown\n    content: MOLINI_PANELS\n", encoding="utf-8")
+    panel = [{"type": "heading", "heading": "Onduleur 1"}]
+    res = db.build_yaml(["energie"], blocks_dir=blocks_dir,
+                        dynamic_cards={"energie": panel})
+    doc = YAML(typ="safe").load(io.StringIO(res.yaml_text))
+    cards = doc["views"][0]["cards"]
+    assert {"type": "markdown", "content": "MOLINI_PANELS"} not in cards
+    assert {"type": "heading", "heading": "Onduleur 1"} in cards
