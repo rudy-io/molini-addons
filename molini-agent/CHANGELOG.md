@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0 — 2026-06-18 (détail par panneau — Phase 1 panel énergie)
+
+- Page Énergie : **détail par panneau**. Grille de production par string générée dynamiquement par onduleur (cartes natives `grid` + `gauge`, une jauge par panneau bornée à 600 W). Détection auto des capteurs PV (SolarMan `*_pvN_power` et IzyPower `*_pvN`) depuis les entités HA réelles — un client à 12 panneaux voit ses 12 jauges sans config manuelle.
+- Builder : marqueur `MOLINI_PANELS` dans le bloc `energie` remplacé par les cartes générées (`dashboard_builder.build_yaml(dynamic_cards=…)`, propagé via `build_and_write` et `execute_rebuild_dashboard`).
+- Tuile **consommation conditionnelle** : aperçu « Consommation maison » affiché automatiquement dès que `sensor.molini_consommation_maison` existe (masqué sinon).
+
 ## 0.6.1 — 2026-06-18 (fix entity_id dashboard énergie)
 
 - La page Énergie référençait les `unique_id` (`molini_solar_power_w`…), mais HA
