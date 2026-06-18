@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0 — 2026-06-18 (panel front Moli — surcouche HA, écran Énergie)
+
+- **Panel front custom** : nouvelle app Preact (`molini-panel/`) embarquée dans l'add-on, servie sur `/local/moli/moli-panel.js` et enregistrée comme `panel_custom` (« Moli » dans la sidebar HA **et** l'app mobile). HA reste le back (auth, appareils, historique, tunnel) ; le panel ne fait que la présentation via la connexion `hass` (WebSocket). Aucune API ni auth à héberger.
+- **Écran Énergie** : production instantanée + aujourd'hui/total, **détail par panneau** regroupé par onduleur (tuiles compactes + mini-barres, numérotation par type), graphe 24 h (SVG maison), compteur HC/HP, tuile conso conditionnelle. Logique de détection PV portée en TS (depuis `panel_detail` 0.7.0).
+- **Agent** : `panel_custom` ajouté à la white-list `PATCHABLE_TOP_KEYS` (JS client, pas de RCE serveur) + posé au provision via `MOLI_HA_CONFIG_PATCH` (idempotent) ; le `run` dépose le bundle dans `/config/www/moli`.
+- Bundle single-file ~36 kB (gzip ~11 kB), styles isolés en shadow DOM. Coexiste avec les dashboards Lovelace (fallback) ; bascule en accueil par défaut + kiosk à venir.
+
 ## 0.7.0 — 2026-06-18 (détail par panneau — Phase 1 panel énergie)
 
 - Page Énergie : **détail par panneau**. Grille de production par string générée dynamiquement par onduleur (cartes natives `grid` + `gauge`, une jauge par panneau bornée à 600 W). Détection auto des capteurs PV (SolarMan `*_pvN_power` et IzyPower `*_pvN`) depuis les entités HA réelles — un client à 12 panneaux voit ses 12 jauges sans config manuelle.
