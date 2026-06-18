@@ -79,6 +79,21 @@ if [ -d "${BLOCKS_SRC}" ]; then
   fi
 fi
 
+# ─── Déploiement du panel front Moli (custom element) ─────────────────────────
+# Le bundle Preact (moli-panel.js) est embarqué dans l'image et copié vers
+# /config/www/moli → servi par HA sur /local/moli/moli-panel.js et chargé via
+# panel_custom. Écrasé à chaque démarrage = toujours à jour.
+PANEL_SRC="/usr/share/molini/panel"
+PANEL_DST="/config/www/moli"
+if [ -d "${PANEL_SRC}" ]; then
+  mkdir -p "${PANEL_DST}"
+  if cp -f "${PANEL_SRC}"/*.js "${PANEL_DST}"/ 2>/dev/null; then
+    bashio::log.info "Panel front déployé → ${PANEL_DST}"
+  else
+    bashio::log.warning "Aucun panel front à déployer depuis ${PANEL_SRC}"
+  fi
+fi
+
 bashio::log.info "Moli Agent ${AGENT_VERSION} starting — central=${CENTRAL_URL} interval=${HEARTBEAT_INTERVAL_S}s runtime=${MOLINI_RUNTIME}"
 
 cd /app

@@ -100,6 +100,20 @@ MOLI_HA_CONFIG_PATCH: dict[str, Any] = {
     "recorder": {
         "purge_keep_days": 14,
     },
+    # Panel front custom Moli — le bundle est déposé par l'agent dans
+    # /config/www/moli et servi par HA sur /local/moli/moli-panel.js.
+    # ``name`` doit matcher le custom element défini par le bundle (moli-panel).
+    "panel_custom": [
+        {
+            "name": "moli-panel",
+            "sidebar_title": "Moli",
+            "sidebar_icon": "mdi:solar-power",
+            "url_path": "moli",
+            "module_url": "/local/moli/moli-panel.js",
+            "embed_iframe": False,
+            "require_admin": False,
+        }
+    ],
 }
 
 

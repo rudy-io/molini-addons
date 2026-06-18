@@ -177,6 +177,32 @@ def test_whitelist_contains_expected_keys():
     assert "frontend" in PATCHABLE_TOP_KEYS
 
 
+def test_whitelist_contains_panel_custom():
+    """Le panel front Moli s'enregistre via panel_custom (JS client, pas RCE)."""
+    assert "panel_custom" in PATCHABLE_TOP_KEYS
+
+
+def test_panel_custom_patch_is_idempotent():
+    """Re-provisionner le panel ne doit PAS empiler un doublon (merge union)."""
+    patch = {
+        "panel_custom": [
+            {
+                "name": "moli-panel",
+                "sidebar_title": "Moli",
+                "url_path": "moli",
+                "module_url": "/local/moli/moli-panel.js",
+            }
+        ]
+    }
+    after_1, changed_1, _ = compute_patch("", patch)
+    assert changed_1 is True
+    assert "moli-panel" in after_1
+    after_2, changed_2, _ = compute_patch(after_1, patch)
+    assert changed_2 is False
+    assert after_1 == after_2
+    assert after_2.count("module_url") == 1
+
+
 def test_whitelist_excludes_dangerous_keys():
     """Regression: the dangerous keys must NEVER end up in the white-list."""
     for forbidden in (

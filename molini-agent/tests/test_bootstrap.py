@@ -260,7 +260,15 @@ async def test_bootstrap_stack_idempotent(mock_supervisor, mock_yaml_patch):
         "  trusted_proxies:\n"
         "    - 172.30.0.0/16\n"
         "recorder:\n"
-        "  purge_keep_days: 14\n",
+        "  purge_keep_days: 14\n"
+        "panel_custom:\n"
+        "  - name: moli-panel\n"
+        "    sidebar_title: Moli\n"
+        "    sidebar_icon: mdi:solar-power\n"
+        "    url_path: moli\n"
+        "    module_url: /local/moli/moli-panel.js\n"
+        "    embed_iframe: false\n"
+        "    require_admin: false\n",
         encoding="utf-8",
     )
 

@@ -63,6 +63,10 @@ PATCHABLE_TOP_KEYS: frozenset[str] = frozenset(
         "sun",
         "tts",
         "media_source",
+        # panel_custom enregistre un panel frontend : il charge du JS *client*
+        # (le bundle Moli qu'on ship nous-mêmes), PAS du code serveur — donc
+        # pas une surface RCE comme shell_command / python_script.
+        "panel_custom",
     }
 )
 
