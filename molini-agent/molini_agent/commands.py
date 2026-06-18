@@ -24,7 +24,7 @@ from typing import Any
 
 import httpx
 
-from . import supervisor_client
+from . import panel_detail, supervisor_client
 from .backup import run_backup_once
 from .bootstrap import (
     ALLOWED_ADDON_NAMES,
@@ -360,6 +360,9 @@ async def execute_rebuild_dashboard(
 
     available = await _ha_available_entity_ids(cfg)
 
+    panel_cards = panel_detail.build_panel_cards(available or set())
+    dyn = {"energie": panel_cards} if panel_cards else None
+
     # Le builder gère la validation + écriture atomique. Path absolu fixe.
     blocks_dir = os.environ.get(
         "MOLINI_DASHBOARD_BLOCKS_DIR", "/config/dashboards/blocks"
@@ -374,6 +377,7 @@ async def execute_rebuild_dashboard(
             blocks_dir=blocks_dir,
             output_path=output_path,
             available_entity_ids=available,
+            dynamic_cards=dyn,
         )
     except (ValueError, FileNotFoundError) as e:
         # ValueError = slug invalide / hors white-list ; FileNotFoundError
