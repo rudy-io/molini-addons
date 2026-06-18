@@ -24,3 +24,11 @@ def test_detect_groups_panels_by_inverter():
 
 def test_detect_empty_when_no_pv():
     assert pd.detect_panels({"sensor.temperature"}) == {}
+
+def test_label_for_inverter():
+    assert pd.inverter_label("inverter", 0) == "Onduleur 1"
+    assert pd.inverter_label("inverter_2", 1) == "Onduleur 2"
+
+def test_label_for_izypower():
+    lbl = pd.inverter_label("sensor.izypower_cloud_maison_35486_55180000aa2e", 2)
+    assert lbl == "Micro-onduleur 3"

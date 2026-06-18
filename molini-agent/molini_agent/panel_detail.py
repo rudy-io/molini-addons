@@ -27,3 +27,10 @@ def detect_panels(entity_ids: set[str]) -> dict[str, list[str]]:
     for prefix in groups:
         groups[prefix].sort(key=lambda e: int(_PV_RE.match(e).group("n")))
     return groups
+
+
+def inverter_label(prefix: str, index: int) -> str:
+    """Libellé lisible pour un groupe d'onduleur (l'index est sa position, 0-based)."""
+    if "izypower" in prefix.lower() or "micro" in prefix.lower():
+        return f"Micro-onduleur {index + 1}"
+    return f"Onduleur {index + 1}"
