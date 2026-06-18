@@ -29,9 +29,15 @@ def detect_panels(entity_ids: set[str]) -> dict[str, list[str]]:
     return groups
 
 
+def _is_micro(prefix: str) -> bool:
+    """Vrai si le préfixe désigne un micro-onduleur (IzyPower & co)."""
+    p = prefix.lower()
+    return "izypower" in p or "micro" in p
+
+
 def inverter_label(prefix: str, index: int) -> str:
-    """Libellé lisible pour un groupe d'onduleur (l'index est sa position, 0-based)."""
-    if "izypower" in prefix.lower() or "micro" in prefix.lower():
+    """Libellé lisible pour un groupe d'onduleur (index = position 0-based DANS SON TYPE)."""
+    if _is_micro(prefix):
         return f"Micro-onduleur {index + 1}"
     return f"Onduleur {index + 1}"
 
@@ -45,10 +51,14 @@ def build_panel_cards(entity_ids: set[str]) -> list[dict[str, Any]]:
     if not groups:
         return []
     cards: list[dict[str, Any]] = []
-    for index, (prefix, eids) in enumerate(sorted(groups.items())):
+    counters: dict[bool, int] = {}
+    for prefix, eids in sorted(groups.items()):
+        micro = _is_micro(prefix)
+        idx = counters.get(micro, 0)
+        counters[micro] = idx + 1
         cards.append({
             "type": "heading",
-            "heading": inverter_label(prefix, index),
+            "heading": inverter_label(prefix, idx),
             "heading_style": "subtitle",
         })
         cards.append({

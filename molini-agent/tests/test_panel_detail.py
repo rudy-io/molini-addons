@@ -49,3 +49,9 @@ def test_build_cards_structure():
 
 def test_build_cards_empty():
     assert pd.build_panel_cards({"sensor.x"}) == []
+
+def test_build_cards_per_type_numbering():
+    cards = pd.build_panel_cards(CAROLE)
+    headings = [c["heading"] for c in cards if c.get("type") == "heading"]
+    # numérotation par type : les 2 micro-onduleurs sont 1 et 2, pas 3 et 4
+    assert headings == ["Onduleur 1", "Onduleur 2", "Micro-onduleur 1", "Micro-onduleur 2"]

@@ -37,6 +37,9 @@ cards:
       - condition: state
         entity: sensor.molini_consommation_maison
         state_not: unavailable
+      - condition: state
+        entity: sensor.molini_consommation_maison
+        state_not: unknown
     card:
       type: glance
       columns: 1
