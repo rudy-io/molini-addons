@@ -33,25 +33,27 @@ def test_label_for_izypower():
     lbl = pd.inverter_label("sensor.izypower_cloud_maison_35486_55180000aa2e", 2)
     assert lbl == "Micro-onduleur 3"
 
-def test_build_cards_structure():
+def test_group_by_installation():
+    groups = pd.group_panels(CAROLE)
+    # 2 installations (marque), pas 4 onduleurs
+    assert [g["label"] for g in groups] == ["Onduleur SolarMan", "Micro-onduleurs IzyPower"]
+    assert len(groups[0]["panels"]) == 6  # inverter (2) + inverter_2 (4) fusionnés
+    assert len(groups[1]["panels"]) == 3  # aa2e (2) + c3e6 (1) dans cette fixture
+    assert groups[0]["panels"][0]["name"] == "P1"
+    assert groups[0]["panels"][0]["eid"] == "sensor.inverter_pv1_power"
+
+def test_build_cards_button_card_fill():
     cards = pd.build_panel_cards(CAROLE)
-    # 1 heading + 1 grid par onduleur (4 détectés : 2 SolarMan + 2 IzyPower)
-    headings = [c for c in cards if c.get("type") == "heading"]
+    headings = [c["heading"] for c in cards if c.get("type") == "heading"]
     grids = [c for c in cards if c.get("type") == "grid"]
-    assert len(headings) == 4 and len(grids) == 4
-    # chaque grid contient des gauge référençant les entity_id réels
-    first_grid = grids[0]
-    assert all(g["type"] == "gauge" for g in first_grid["cards"])
-    assert first_grid["cards"][0]["entity"].startswith("sensor.")
-    # gauge bornée et en W
-    assert first_grid["cards"][0]["max"] == 600
-    assert first_grid["cards"][0]["unit"] == "W"
+    assert headings == ["Onduleur SolarMan", "Micro-onduleurs IzyPower"]
+    assert len(grids) == 2
+    first = grids[0]["cards"][0]
+    assert first["type"] == "custom:button-card"
+    assert first["entity"].startswith("sensor.")
+    # le fond est un template button-card qui se remplit selon la prod
+    bg = next(s["background"] for s in first["styles"]["card"] if "background" in s)
+    assert "linear-gradient" in bg and "entity.state" in bg
 
 def test_build_cards_empty():
     assert pd.build_panel_cards({"sensor.x"}) == []
-
-def test_build_cards_per_type_numbering():
-    cards = pd.build_panel_cards(CAROLE)
-    headings = [c["heading"] for c in cards if c.get("type") == "heading"]
-    # numérotation par type : les 2 micro-onduleurs sont 1 et 2, pas 3 et 4
-    assert headings == ["Onduleur 1", "Onduleur 2", "Micro-onduleur 1", "Micro-onduleur 2"]

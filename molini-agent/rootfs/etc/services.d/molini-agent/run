@@ -94,6 +94,21 @@ if [ -d "${PANEL_SRC}" ]; then
   fi
 fi
 
+# ─── Déploiement des cartes Lovelace custom (button-card, apexcharts) ─────────
+# Embarquées dans l'image, copiées vers /config/www/moli-cards → servies sur
+# /local/moli-cards/ et chargées via frontend:extra_module_url (cf. provision).
+# Évite d'avoir à installer/maintenir HACS manuellement sur chaque box.
+CARDS_SRC="/usr/share/molini/cards"
+CARDS_DST="/config/www/moli-cards"
+if [ -d "${CARDS_SRC}" ]; then
+  mkdir -p "${CARDS_DST}"
+  if cp -f "${CARDS_SRC}"/*.js "${CARDS_DST}"/ 2>/dev/null; then
+    bashio::log.info "Cartes Lovelace déployées → ${CARDS_DST}"
+  else
+    bashio::log.warning "Aucune carte à déployer depuis ${CARDS_SRC}"
+  fi
+fi
+
 bashio::log.info "Moli Agent ${AGENT_VERSION} starting — central=${CENTRAL_URL} interval=${HEARTBEAT_INTERVAL_S}s runtime=${MOLINI_RUNTIME}"
 
 cd /app

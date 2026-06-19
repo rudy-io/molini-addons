@@ -87,18 +87,29 @@ _SLUG_RE = re.compile(r"^[a-z_][a-z0-9_]*$")
 PANEL_MARKER = "MOLINI_PANELS"
 
 
-def _inject_dynamic_cards(view: dict, cards: list[dict]) -> None:
-    """Remplace, dans view['cards'], la carte-marqueur MOLINI_PANELS par `cards`."""
-    existing = view.get("cards")
-    if not isinstance(existing, list):
-        return
-    out = []
-    for c in existing:
+def _replace_marker(card_list: list, cards: list[dict]) -> list:
+    """Remplace la carte-marqueur MOLINI_PANELS par `cards` dans une liste de cartes."""
+    out: list = []
+    for c in card_list:
         if isinstance(c, dict) and c.get("type") == "markdown" and c.get("content") == PANEL_MARKER:
             out.extend(cards)
         else:
             out.append(c)
-    view["cards"] = out
+    return out
+
+
+def _inject_dynamic_cards(view: dict, cards: list[dict]) -> None:
+    """Remplace la carte-marqueur MOLINI_PANELS par `cards`.
+
+    Gère les deux layouts : masonry (``view['cards']``) et sections
+    (``view['sections'][*]['cards']``)."""
+    if isinstance(view.get("cards"), list):
+        view["cards"] = _replace_marker(view["cards"], cards)
+    sections = view.get("sections")
+    if isinstance(sections, list):
+        for sec in sections:
+            if isinstance(sec, dict) and isinstance(sec.get("cards"), list):
+                sec["cards"] = _replace_marker(sec["cards"], cards)
 
 
 @dataclass(frozen=True)

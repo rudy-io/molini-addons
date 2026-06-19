@@ -268,7 +268,11 @@ async def test_bootstrap_stack_idempotent(mock_supervisor, mock_yaml_patch):
         "    url_path: moli\n"
         "    module_url: /local/moli/moli-panel.js\n"
         "    embed_iframe: false\n"
-        "    require_admin: false\n",
+        "    require_admin: false\n"
+        "frontend:\n"
+        "  extra_module_url:\n"
+        "    - /local/moli-cards/button-card.js\n"
+        "    - /local/moli-cards/apexcharts-card.js\n",
         encoding="utf-8",
     )
 

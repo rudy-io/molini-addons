@@ -114,6 +114,15 @@ MOLI_HA_CONFIG_PATCH: dict[str, Any] = {
             "require_admin": False,
         }
     ],
+    # Charge nos cartes Lovelace custom (button-card, apexcharts) — déposées par
+    # le run dans /config/www/moli-cards. frontend est patchable ;
+    # extra_module_url est une liste → merge par union (idempotent).
+    "frontend": {
+        "extra_module_url": [
+            "/local/moli-cards/button-card.js",
+            "/local/moli-cards/apexcharts-card.js",
+        ],
+    },
 }
 
 

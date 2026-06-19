@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.7 — 2026-06-19 (dashboard énergie natif full HA — sections + button-card + apexcharts)
+
+- **Bloc `energie.yaml` en vue `sections`** (corrige le scramble masonry) : jauges natives production/consommation, détail par panneau, courbe 24 h, compteur.
+- **Détail par panneau** (`panel_detail.py`) regroupé **par installation** (SolarMan/IzyPower) ; chaque panneau = **`custom:button-card` qui se remplit** (dégradé vert/ambre selon la prod, template JS).
+- **Courbe 24 h** : `custom:apexcharts-card` production + consommation superposées.
+- **Cartes Lovelace embarquées** dans l'add-on (`button-card`, `apexcharts-card`) → déposées dans `/config/www/moli-cards` par le `run` + chargées via **`frontend: extra_module_url`** (patché par l'agent) — **sans HACS manuel**, télé-géré.
+- `dashboard_builder._inject_dynamic_cards` gère désormais l'injection du marqueur dans une vue **sections** (et toujours masonry).
+
 ## 0.8.6 — 2026-06-19 (fix gate self-update)
 
 - **Fix `agent_self_update`** : la décision « une MAJ est-elle dispo ? » se base désormais sur la **vue fraîche du superviseur** (`addons/self/info` → `update_available`), pas sur l'attribut `latest_version` de l'entité `update.*` de HA Core — qui peut **traîner ~1 jour** et faisait conclure « already latest » à tort (constaté en validation 0.8.5). L'entité ne sert plus qu'à fournir l'`entity_id` à `update.install` ; le superviseur installe SA dernière version (fraîche). Petit retry après `store_reload` (asynchrone).
