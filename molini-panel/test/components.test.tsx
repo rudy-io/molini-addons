@@ -1,42 +1,41 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/preact';
 import { PanelDetail } from '../src/components/PanelDetail';
-import { ConsoTile } from '../src/components/ConsoTile';
+import { Gauge } from '../src/components/Gauge';
 import { mockHass } from '../src/dev/mockHass';
-import type { Hass } from '../src/hass/types';
 
 afterEach(cleanup);
 
 describe('PanelDetail', () => {
-  it('renders the 4 inverter labels and 9 panel tiles from a hass', () => {
-    const { getByText, container } = render(<PanelDetail hass={mockHass} />);
-    expect(getByText('Onduleur 1')).toBeTruthy();
-    expect(getByText('Onduleur 2')).toBeTruthy();
-    expect(getByText('Micro-onduleur 1')).toBeTruthy();
-    expect(getByText('Micro-onduleur 2')).toBeTruthy();
-    expect(container.querySelectorAll('[data-panel-tile]').length).toBe(9);
+  it('renders 2 installations (SolarMan + IzyPower) and 12 panel modules', () => {
+    const { container } = render(<PanelDetail hass={mockHass} />);
+    expect(container.textContent).toContain('Onduleur SolarMan');
+    expect(container.textContent).toContain('Micro-onduleurs IzyPower');
+    expect(container.querySelectorAll('[data-panel-tile]').length).toBe(12);
   });
 });
 
-describe('ConsoTile', () => {
-  it('renders nothing when the conso sensor is absent', () => {
-    const { container } = render(<ConsoTile hass={mockHass} />);
-    expect(container.firstChild).toBeNull();
+describe('Gauge', () => {
+  it('shows the value + label when available', () => {
+    const { container } = render(
+      <Gauge value={1161} max={5000} label="Production solaire" color="#1d9e75" />,
+    );
+    expect(container.textContent).toContain('Production solaire');
+    expect(container.textContent).toMatch(/1.?161/);
   });
 
-  it('renders the value when the conso sensor exists', () => {
-    const withConso: Hass = {
-      states: {
-        ...mockHass.states,
-        'sensor.molini_consommation_maison': {
-          entity_id: 'sensor.molini_consommation_maison',
-          state: '742',
-          attributes: {},
-        },
-      },
-    };
-    const { getByText } = render(<ConsoTile hass={withConso} />);
-    expect(getByText('Consommation maison')).toBeTruthy();
-    expect(getByText(/742/)).toBeTruthy();
+  it('shows a muted dash + label when the value is null', () => {
+    const { container } = render(
+      <Gauge
+        value={null}
+        max={5000}
+        label="Consommation maison"
+        color="#378add"
+        mutedLabel="non suivie"
+      />,
+    );
+    expect(container.textContent).toContain('Consommation maison');
+    expect(container.textContent).toContain('—');
+    expect(container.textContent).toContain('non suivie');
   });
 });

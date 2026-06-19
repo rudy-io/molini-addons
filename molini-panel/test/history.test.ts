@@ -25,4 +25,11 @@ describe('fetchHistory', () => {
       { t: 1_700_000_900_000, v: 20 },
     ]);
   });
+
+  it('returns [] (no fake mock) when callWS is present but the entity has no history', async () => {
+    const hass = { states: {}, callWS: async () => ({}) } as unknown as Hass;
+    // profil "load" : sur la vraie box sans capteur conso → aucune courbe inventée.
+    const pts = await fetchHistory(hass, 'sensor.molini_consommation_maison', 24, 'load');
+    expect(pts).toEqual([]);
+  });
 });

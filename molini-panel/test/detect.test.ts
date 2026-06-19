@@ -57,19 +57,19 @@ describe('inverterLabel', () => {
 });
 
 describe('groupPanels', () => {
-  it('numbers inverters per type (no "Micro-onduleur 3")', () => {
+  it('groups by installation (SolarMan / IzyPower), not per device', () => {
     const groups = groupPanels(CAROLE);
     expect(groups.map((x) => x.label)).toEqual([
-      'Onduleur 1',
-      'Onduleur 2',
-      'Micro-onduleur 1',
-      'Micro-onduleur 2',
+      'Onduleur SolarMan',
+      'Micro-onduleurs IzyPower',
     ]);
-  });
-  it('exposes P-named panels with their real eids', () => {
-    const ond2 = groupPanels(CAROLE).find((g) => g.label === 'Onduleur 2')!;
-    expect(ond2.panels.map((p) => p.name)).toEqual(['P1', 'P2', 'P3', 'P4']);
-    expect(ond2.panels[0].eid).toBe('sensor.inverter_2_pv1_power');
+    const [sm, izy] = groups;
+    // SolarMan = inverter (2) + inverter_2 (4) fusionnés = 6, labellisés P1..P6
+    expect(sm.panels.map((p) => p.name)).toEqual(['P1', 'P2', 'P3', 'P4', 'P5', 'P6']);
+    expect(sm.panels[0].eid).toBe('sensor.inverter_pv1_power');
+    expect(sm.panels[2].eid).toBe('sensor.inverter_2_pv1_power');
+    // IzyPower = aa2e (2) + c3e6 (1) fusionnés dans cette fixture
+    expect(izy.panels).toHaveLength(3);
   });
   it('returns [] when there is no PV', () => {
     expect(groupPanels(['sensor.x'])).toEqual([]);
