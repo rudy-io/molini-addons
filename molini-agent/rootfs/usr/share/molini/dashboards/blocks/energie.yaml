@@ -2,7 +2,7 @@ title: Énergie
 path: energie
 icon: mdi:solar-power
 type: sections
-max_columns: 3
+max_columns: 1
 sections:
   - type: grid
     cards:

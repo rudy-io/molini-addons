@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.9 — 2026-06-19 (dashboard en une seule colonne)
+
+- Vue Énergie en **une seule colonne** (`max_columns: 1`) : les grandes sections (production, panneaux, courbe, compteur) s'empilent les unes sous les autres.
+- Sert aussi de release de **validation de l'update à distance on-demand** (déployée via `agent_self_update`, sans MAJ manuelle).
+
 ## 0.8.8 — 2026-06-19 (fix update on-demand + retouches dashboard)
 
 - **Fix `agent_self_update`** : on **rafraîchit l'entité update** (`homeassistant.update_entity`) AVANT `update.install`. Sans ça, `update.install` réinstalle la version périmée que l'entité croit être la dernière (= no-op, constaté en 0.8.7). Devrait débloquer la MAJ on-demand à distance.
