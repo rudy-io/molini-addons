@@ -188,11 +188,26 @@ async def execute_agent_self_update(cfg: Config) -> dict[str, Any]:
     """
     await supervisor_client.store_reload()
     info = await supervisor_client.self_info()
-    name = info.get("name") or "Moli Agent"
+    if not info.get("update_available"):
+        # store_reload peut être asynchrone côté superviseur : 2e essai après un
+        # court délai avant de conclure "à jour".
+        await asyncio.sleep(5)
+        await supervisor_client.store_reload()
+        info = await supervisor_client.self_info()
 
+    # Décision basée sur la vue FRAÎCHE du superviseur (self/info), PAS sur
+    # l'attribut latest_version de l'entité update.* de HA (qui peut traîner ~1j).
+    if not info.get("update_available"):
+        return {"updated": False, "version": info.get("version"), "note": "already latest"}
+
+    current = info.get("version")
+    latest = info.get("version_latest")
+    name = info.get("name") or "Moli Agent"
     ha = HAClient(cfg.ha_url, cfg.ha_token)
     try:
         states = await ha.states()
+        # L'entité update.* ne sert qu'à fournir l'entity_id à update.install ;
+        # le superviseur installera SA dernière version (fraîche), pas l'attribut.
         entity = next(
             (
                 s
@@ -204,13 +219,8 @@ async def execute_agent_self_update(cfg: Config) -> dict[str, Any]:
         )
         if entity is None:
             return {"updated": False, "note": f"update entity introuvable pour '{name}'"}
-        attrs = entity.get("attributes") or {}
-        installed = attrs.get("installed_version")
-        latest = attrs.get("latest_version")
-        if not latest or latest == installed:
-            return {"updated": False, "version": installed, "note": "already latest"}
         await ha.call_service("update", "install", {"entity_id": entity["entity_id"]})
-        return {"updating": True, "entity": entity["entity_id"], "from": installed, "to": latest}
+        return {"updating": True, "entity": entity["entity_id"], "from": current, "to": latest}
     finally:
         await ha.close()
 

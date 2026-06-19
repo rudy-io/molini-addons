@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.6 — 2026-06-19 (fix gate self-update)
+
+- **Fix `agent_self_update`** : la décision « une MAJ est-elle dispo ? » se base désormais sur la **vue fraîche du superviseur** (`addons/self/info` → `update_available`), pas sur l'attribut `latest_version` de l'entité `update.*` de HA Core — qui peut **traîner ~1 jour** et faisait conclure « already latest » à tort (constaté en validation 0.8.5). L'entité ne sert plus qu'à fournir l'`entity_id` à `update.install` ; le superviseur installe SA dernière version (fraîche). Petit retry après `store_reload` (asynchrone).
+
 ## 0.8.5 — 2026-06-19 (release de validation : self-update à distance)
 
 - Bump de version (sans code) pour valider que `agent_self_update` (via `update.install` de HA Core) met bien à jour la box pilote **0.8.4 → 0.8.5 sans aucune action manuelle**.
