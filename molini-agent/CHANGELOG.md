@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.1 — 2026-06-19 (redesign écran énergie : jauges + panneaux remplis)
+
+- **Jauges demi-cercle** pour la production et la consommation (la conso s'affiche « non suivie » tant que le capteur Linky TIC standard n'existe pas).
+- **Panneaux dessinés** : chaque string est un module PV qui se remplit (vert, ambre si très faible) proportionnellement à sa production.
+- **Regroupement par installation** : strings regroupés par marque (SolarMan via `inverter*`, IzyPower via `izypower*`) au lieu d'un groupe par onduleur — 2 installations claires plutôt que 4.
+- **Courbe 24 h** : production ET consommation superposées (légende ; pas de courbe conso inventée si le capteur n'existe pas sur la box).
+- Allègement : titres de section retirés (contenu induit), stat unique « Produit aujourd'hui ».
+
 ## 0.8.0 — 2026-06-18 (panel front Moli — surcouche HA, écran Énergie)
 
 - **Panel front custom** : nouvelle app Preact (`molini-panel/`) embarquée dans l'add-on, servie sur `/local/moli/moli-panel.js` et enregistrée comme `panel_custom` (« Moli » dans la sidebar HA **et** l'app mobile). HA reste le back (auth, appareils, historique, tunnel) ; le panel ne fait que la présentation via la connexion `hass` (WebSocket). Aucune API ni auth à héberger.
