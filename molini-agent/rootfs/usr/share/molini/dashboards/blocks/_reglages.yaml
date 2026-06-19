@@ -11,3 +11,25 @@ cards:
       Les paramètres techniques de votre box (broker, passerelle, sauvegardes)
       sont gérés automatiquement par Moli. Cette page accueillera bientôt vos
       préférences (notifications, scénarios, accès famille).
+  - type: markdown
+    content: >
+      Besoin d'accéder à l'interface complète de Home Assistant (appareils,
+      historiques, réglages avancés) ? Utilise le bouton ci-dessous.
+  - type: custom:button-card
+    name: Configurer Home Assistant
+    icon: mdi:cog-outline
+    show_state: false
+    tap_action:
+      action: navigate
+      navigation_path: /moli-energie/reglages?disable_km
+    styles:
+      card:
+        - height: 64px
+        - border-radius: 12px
+        - border: 1px solid '#2a3340'
+      name:
+        - font-size: 14px
+        - color: '#e6e9ef'
+      icon:
+        - width: 26px
+        - color: '#1d9e75'

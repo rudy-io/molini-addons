@@ -260,6 +260,26 @@ def test_build_yaml_reports_missing_entities_per_block():
     )
 
 
+# ─── kiosk_mode appliance ─────────────────────────────────────────────────────
+
+
+def test_build_yaml_contains_kiosk_mode(tmp_path):
+    """Le YAML généré contient la config kiosk_mode pour masquer la sidebar
+    aux non-admins (mode « appliance Moli »)."""
+    (tmp_path / "_reglages.yaml").write_text(
+        "title: Réglages\npath: reglages\ncards: []\n", encoding="utf-8"
+    )
+    result = build_yaml(["_reglages"], blocks_dir=tmp_path)
+    assert "kiosk_mode" in result.yaml_text
+    assert "non_admin_settings" in result.yaml_text
+    assert "hide_sidebar" in result.yaml_text
+
+    # Vérifie que la structure est correcte au niveau YAML parsé
+    from ruamel.yaml import YAML as _YAML
+    data = _YAML(typ="rt").load(result.yaml_text)
+    assert data["kiosk_mode"]["non_admin_settings"]["hide_sidebar"] is True
+
+
 # ─── write_yaml_atomic ────────────────────────────────────────────────────────
 
 

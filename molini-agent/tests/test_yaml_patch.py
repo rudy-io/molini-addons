@@ -21,6 +21,7 @@ from molini_agent.yaml_patch import (
     YamlPatchError,
     apply_patch_to_file,
     compute_patch,
+    remove_top_keys_in_file,
 )
 
 
@@ -369,3 +370,71 @@ def test_partial_change_only_lists_keys_actually_modified():
     # Both keys were in the patch — both reported, regardless of which actually mutated
     assert "http" in report["applied_keys"]
     assert "recorder" in report["applied_keys"]
+
+
+# ─── remove_top_keys_in_file ──────────────────────────────────────────────────
+
+
+def test_remove_panel_custom_is_in_patchable_keys():
+    """Prerequisite: panel_custom must be removable (in PATCHABLE_TOP_KEYS)."""
+    assert "panel_custom" in PATCHABLE_TOP_KEYS
+
+
+def test_remove_present_key_changed_true(tmp_path):
+    """Removing a present patchable key: changed=True, key listed in removed."""
+    target = tmp_path / "configuration.yaml"
+    target.write_text(
+        "http:\n  use_x_forwarded_for: true\n"
+        "panel_custom:\n  - name: moli-panel\n",
+        encoding="utf-8",
+    )
+    report = remove_top_keys_in_file(str(target), ["panel_custom"])
+    assert report["ok"] is True
+    assert report["changed"] is True
+    assert "panel_custom" in report["removed"]
+
+    remaining = target.read_text(encoding="utf-8")
+    assert "panel_custom" not in remaining
+    assert "use_x_forwarded_for" in remaining  # other keys preserved
+
+
+def test_remove_absent_key_is_noop(tmp_path):
+    """Removing a key that doesn't exist: changed=False, removed is empty."""
+    target = tmp_path / "configuration.yaml"
+    target.write_text("http:\n  use_x_forwarded_for: true\n", encoding="utf-8")
+    original_text = target.read_text(encoding="utf-8")
+
+    report = remove_top_keys_in_file(str(target), ["panel_custom"])
+    assert report["ok"] is True
+    assert report["changed"] is False
+    assert report["removed"] == []
+    # File must be unchanged (no write performed on no-op)
+    assert target.read_text(encoding="utf-8") == original_text
+
+
+def test_remove_non_patchable_key_raises(tmp_path):
+    """Keys outside PATCHABLE_TOP_KEYS must raise ValueError with forbidden_key."""
+    target = tmp_path / "configuration.yaml"
+    target.write_text("http:\n  use_x_forwarded_for: true\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="forbidden_key"):
+        remove_top_keys_in_file(str(target), ["shell_command"])
+
+
+def test_remove_multiple_keys(tmp_path):
+    """Removing multiple keys: present ones removed, absent silently ignored."""
+    target = tmp_path / "configuration.yaml"
+    target.write_text(
+        "http:\n  use_x_forwarded_for: true\n"
+        "panel_custom:\n  - name: moli-panel\n"
+        "recorder:\n  purge_keep_days: 14\n",
+        encoding="utf-8",
+    )
+    report = remove_top_keys_in_file(
+        str(target), ["panel_custom", "recorder", "frontend"]
+    )
+    assert set(report["removed"]) == {"panel_custom", "recorder"}
+    assert report["changed"] is True
+    remaining = target.read_text(encoding="utf-8")
+    assert "panel_custom" not in remaining
+    assert "recorder" not in remaining
+    assert "http" in remaining

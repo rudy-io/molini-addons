@@ -293,6 +293,10 @@ def build_yaml(
     yaml = _yaml()
     doc: dict[str, Any] = {}
     doc["title"] = "Moli"
+    # Mode « appliance Moli » : masque la sidebar HA pour les non-admins.
+    # Les admins gardent l'interface complète. Le paramètre ?disable_km dans
+    # l'URL réaffiche temporairement l'interface HA (bouton dans _reglages).
+    doc["kiosk_mode"] = {"non_admin_settings": {"hide_sidebar": True}}
     views = []
     missing_by_block: dict[str, list[str]] = {}
 

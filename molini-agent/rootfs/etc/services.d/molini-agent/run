@@ -80,22 +80,7 @@ if [ -d "${BLOCKS_SRC}" ]; then
   fi
 fi
 
-# ─── Déploiement du panel front Moli (custom element) ─────────────────────────
-# Le bundle Preact (moli-panel.js) est embarqué dans l'image et copié vers
-# /config/www/moli → servi par HA sur /local/moli/moli-panel.js et chargé via
-# panel_custom. Écrasé à chaque démarrage = toujours à jour.
-PANEL_SRC="/usr/share/molini/panel"
-PANEL_DST="/config/www/moli"
-if [ -d "${PANEL_SRC}" ]; then
-  mkdir -p "${PANEL_DST}"
-  if cp -f "${PANEL_SRC}"/*.js "${PANEL_DST}"/ 2>/dev/null; then
-    bashio::log.info "Panel front déployé → ${PANEL_DST}"
-  else
-    bashio::log.warning "Aucun panel front à déployer depuis ${PANEL_SRC}"
-  fi
-fi
-
-# ─── Déploiement des cartes Lovelace custom (button-card, apexcharts) ─────────
+# ─── Déploiement des cartes Lovelace custom (button-card, apexcharts, kiosk-mode) ─────────
 # Embarquées dans l'image, copiées vers /config/www/moli-cards → servies sur
 # /local/moli-cards/ et chargées via frontend:extra_module_url (cf. provision).
 # Évite d'avoir à installer/maintenir HACS manuellement sur chaque box.

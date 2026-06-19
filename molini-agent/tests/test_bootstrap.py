@@ -252,7 +252,9 @@ async def test_bootstrap_stack_idempotent(mock_supervisor, mock_yaml_patch):
             "stopped" if "cloudflared" in slug else "started"
         ),
     }
-    # Pre-create configuration.yaml with the patches already applied
+    # Pre-create configuration.yaml with the patches already applied.
+    # Must match MOLI_HA_CONFIG_PATCH exactly (v0.12.0: no panel_custom,
+    # kiosk-mode.js added to extra_module_url).
     mock_yaml_patch.write_text(
         "default_config:\n"
         "http:\n"
@@ -261,18 +263,11 @@ async def test_bootstrap_stack_idempotent(mock_supervisor, mock_yaml_patch):
         "    - 172.30.0.0/16\n"
         "recorder:\n"
         "  purge_keep_days: 14\n"
-        "panel_custom:\n"
-        "  - name: moli-panel\n"
-        "    sidebar_title: Moli\n"
-        "    sidebar_icon: mdi:solar-power\n"
-        "    url_path: moli\n"
-        "    module_url: /local/moli/moli-panel.js\n"
-        "    embed_iframe: false\n"
-        "    require_admin: false\n"
         "frontend:\n"
         "  extra_module_url:\n"
         "    - /local/moli-cards/button-card.js\n"
         "    - /local/moli-cards/apexcharts-card.js\n"
+        "    - /local/moli-cards/kiosk-mode.js\n"
         "  themes:\n"
         "    Moli:\n"
         "      primary-color: '#1d9e75'\n"

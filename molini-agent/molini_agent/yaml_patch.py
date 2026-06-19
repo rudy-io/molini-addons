@@ -251,3 +251,99 @@ def apply_patch_to_file(
         "yaml_patch: wrote %s (applied %s)", path, ", ".join(sorted(patch.keys()))
     )
     return report
+
+
+def remove_top_keys_in_file(
+    path: str,
+    keys: list[str],
+    *,
+    yaml_obj: YAML | None = None,
+    make_backup: bool = True,
+) -> dict:
+    """Delete top-level keys from the YAML file at ``path`` atomically.
+
+    Only keys in ``PATCHABLE_TOP_KEYS`` may be removed — others raise
+    ``ValueError("forbidden_key:<k>")``.  Keys that don't exist in the
+    document are silently ignored (no-op, ``changed=False``).
+
+    Returns ``{"ok": True, "removed": [...], "changed": bool, "path": path}``.
+    """
+    bad = [k for k in keys if k not in PATCHABLE_TOP_KEYS]
+    if bad:
+        raise ValueError(
+            f"forbidden_key:{bad[0]}: only {sorted(PATCHABLE_TOP_KEYS)} are removable"
+        )
+
+    if not os.path.isabs(path):
+        raise YamlPatchError(f"path_not_absolute: {path}")
+
+    existed = os.path.exists(path)
+    current_text = ""
+    if existed:
+        with open(path, "r", encoding="utf-8") as f:
+            current_text = f.read()
+
+    y = yaml_obj or _yaml()
+    if current_text.strip():
+        try:
+            doc = y.load(current_text)
+        except Exception as e:
+            raise YamlPatchError(f"yaml_parse_error: {e}") from e
+        if doc is None:
+            doc = CommentedMap()
+    else:
+        doc = CommentedMap()
+
+    if not _is_mapping(doc):
+        raise YamlPatchError(
+            f"yaml_root_not_mapping: got {type(doc).__name__}, expected mapping"
+        )
+
+    removed: list[str] = []
+    for k in keys:
+        if k in doc:
+            del doc[k]
+            removed.append(k)
+
+    report: dict[str, Any] = {
+        "ok": True,
+        "removed": removed,
+        "changed": bool(removed),
+        "path": path,
+    }
+
+    if not removed:
+        log.info("yaml_patch: remove_top_keys: %s — nothing to remove", path)
+        return report
+
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+
+    if existed and make_backup:
+        bak = f"{path}.bak-{datetime.now().strftime('%Y%m%d')}"
+        if not os.path.exists(bak):
+            try:
+                shutil.copy2(path, bak)
+                report["backup"] = bak
+            except OSError as e:
+                log.warning("yaml_patch: backup failed (%s) — continuing", e)
+
+    buf = StringIO()
+    y.dump(doc, buf)
+    new_text = buf.getvalue()
+
+    fd, tmp = tempfile.mkstemp(prefix=".molini_yaml_remove_", dir=parent or None)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(new_text)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except FileNotFoundError:
+            pass
+        raise
+
+    log.info("yaml_patch: removed top-level keys %s from %s", removed, path)
+    return report

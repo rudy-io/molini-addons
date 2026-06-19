@@ -100,27 +100,15 @@ MOLI_HA_CONFIG_PATCH: dict[str, Any] = {
     "recorder": {
         "purge_keep_days": 14,
     },
-    # Panel front custom Moli — le bundle est déposé par l'agent dans
-    # /config/www/moli et servi par HA sur /local/moli/moli-panel.js.
-    # ``name`` doit matcher le custom element défini par le bundle (moli-panel).
-    "panel_custom": [
-        {
-            "name": "moli-panel",
-            "sidebar_title": "Moli",
-            "sidebar_icon": "mdi:solar-power",
-            "url_path": "moli",
-            "module_url": "/local/moli/moli-panel.js",
-            "embed_iframe": False,
-            "require_admin": False,
-        }
-    ],
-    # Charge nos cartes Lovelace custom (button-card, apexcharts) — déposées par
-    # le run dans /config/www/moli-cards. frontend est patchable ;
+    # Charge nos cartes Lovelace custom (button-card, apexcharts, kiosk-mode) —
+    # déposées par le run dans /config/www/moli-cards. frontend est patchable ;
     # extra_module_url est une liste → merge par union (idempotent).
+    # kiosk-mode masque la sidebar HA pour les non-admins (mode appliance Moli).
     "frontend": {
         "extra_module_url": [
             "/local/moli-cards/button-card.js",
             "/local/moli-cards/apexcharts-card.js",
+            "/local/moli-cards/kiosk-mode.js",
         ],
         # Thème Moli — fond navy de marque, accents vert/ambre, cartes
         # arrondies. Appliqué par vue via `theme: Moli` dans les blocs.

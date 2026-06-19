@@ -36,6 +36,7 @@ from .config import Config
 from .dashboard_builder import build_and_write, prod_gauge_scale
 from .ha_client import HAClient
 from .ha_discovery import execute_ha_provision
+from .yaml_patch import remove_top_keys_in_file
 
 log = logging.getLogger("molini_agent.commands")
 
@@ -380,16 +381,45 @@ async def execute_patch_ha_config(payload: dict[str, Any] | None) -> dict[str, A
     payload attendu::
 
         { "config": { "http": { "trusted_proxies": [...] }, "recorder": {...} } }
+        { "remove": ["panel_custom"] }
+        { "config": { ... }, "remove": ["panel_custom"] }
 
     La validation des clés top-level passe par ``yaml_patch.PATCHABLE_TOP_KEYS``.
     Toute clé hors de cette liste fait échouer la commande — protège contre la
     pose d'``automation:`` ou ``python_script:`` malveillants.
+
+    ``config`` et ``remove`` sont indépendants : un payload peut contenir l'un,
+    l'autre, ou les deux. Si ni ``config`` ni ``remove`` n'est fourni, la
+    commande échoue.
     """
     payload = payload or {}
     cfg_patch = payload.get("config")
-    if not cfg_patch or not isinstance(cfg_patch, dict):
-        raise RuntimeError("missing `config` in payload")
-    return bootstrap_patch_ha_config(cfg_patch)
+    remove_keys = payload.get("remove")
+
+    if not cfg_patch and not remove_keys:
+        raise RuntimeError("missing `config` or `remove` in payload")
+
+    result: dict[str, Any] = {}
+
+    # ── Deep-merge patch ──────────────────────────────────────────────────────
+    if cfg_patch:
+        if not isinstance(cfg_patch, dict):
+            raise RuntimeError("missing or invalid `config`: must be a mapping")
+        result.update(bootstrap_patch_ha_config(cfg_patch))
+
+    # ── Key removal ───────────────────────────────────────────────────────────
+    if remove_keys:
+        if not isinstance(remove_keys, list):
+            raise RuntimeError("`remove` must be a list of key names")
+        config_path = os.environ.get("HA_CONFIG_PATH", "/config/configuration.yaml")
+        try:
+            removal_report = remove_top_keys_in_file(config_path, remove_keys)
+        except (ValueError, Exception) as exc:
+            raise RuntimeError(str(exc)) from exc
+        result["removed"] = removal_report["removed"]
+        result["remove_changed"] = removal_report["changed"]
+
+    return result
 async def _ha_available_entity_ids(cfg: Config) -> set[str] | None:
     """Liste les entity_id dispo côté HA pour le check des blocs.
 

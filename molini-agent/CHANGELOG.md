@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.12.0
+
+- Mode « appliance Moli » : pour les utilisateurs **non-admin** (kiosk-mode chargé via `extra_module_url`), la **sidebar HA est masquée** — ils ne voient que le dashboard Moli. Les admins gardent l'interface complète.
+- Bouton **« Configurer Home Assistant »** (onglet Réglages) → `?disable_km` → réaffiche l'interface HA complète (on ne verrouille personne).
+- Suppression de l'ancien panneau `panel_custom` Moli (front Preact abandonné) : retiré du patch + nouvelle capacité `patch_ha_config` `{"remove": ["panel_custom"]}` pour le retirer des box existantes.
+- `kiosk-mode.js` embarqué dans l'add-on (comme button-card/apexcharts), zéro HACS manuel.
+
 ## 0.11.1
 
 - Fix de l'auto-calibrage 0.11.0 : l'historique HA ne remonte en pratique que **~2 j** (le recorder purge au-delà → requête vide), donc le calibrage retombait sur les **planchers** (3000 W / 450). Désormais le **pic max-ever est mémorisé** dans un store persisté `/config/.moli_capacities.json`, **alimenté en continu par le heartbeat** (toutes les 5 min, depuis les états déjà lus — aucun appel HA en plus) + seedé par une fenêtre historique courte (2 j) au rebuild. Le calibrage ne perd plus jamais le pic réel observé.
