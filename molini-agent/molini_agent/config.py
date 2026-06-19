@@ -19,6 +19,7 @@ class Config:
     linky_hp_entity: str
     linky_tempo_today_entity: str
     linky_tempo_tomorrow_entity: str
+    prix_kwh: float
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -49,6 +50,7 @@ class Config:
             linky_tempo_tomorrow_entity=os.environ.get(
                 "LINKY_TEMPO_TOMORROW_ENTITY", "sensor.rte_tempo_prochaine_couleur"
             ),
+            prix_kwh=float(os.environ.get("PRIX_KWH") or "0.2516"),
         )
 
 

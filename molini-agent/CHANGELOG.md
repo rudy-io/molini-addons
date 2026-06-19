@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.0
+
+- Prix de l'électricité configurable (option `prix_kwh`, défaut 0.2516 €/kWh) : le champ « € économisés » du dashboard utilise désormais le vrai tarif du client (substitution `__PRIX_KWH__` à la génération du dashboard).
+- Thème « Moli » (fond navy de marque, accents vert/ambre, cartes arrondies) ajouté à `frontend.themes` et appliqué aux vues du dashboard via `theme: Moli`.
+
 ## 0.8.9 — 2026-06-19 (dashboard en une seule colonne)
 
 - Vue Énergie en **une seule colonne** (`max_columns: 1`) : les grandes sections (production, panneaux, courbe, compteur) s'empilent les unes sous les autres.

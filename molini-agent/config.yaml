@@ -4,7 +4,7 @@
 
 slug: molini_agent
 name: Moli Agent
-version: "0.8.9"
+version: "0.9.0"
 description: >-
   Agent Moli pour Home Assistant OS — heartbeat 5 min vers le central
   moli.energy, backups quotidiens chiffrés age + upload MinIO, et exécution
@@ -49,6 +49,7 @@ options:
   linky_hp_entity: "sensor.linky_index_hchp"
   linky_tempo_today_entity: "sensor.rte_tempo_couleur_actuelle"
   linky_tempo_tomorrow_entity: "sensor.rte_tempo_prochaine_couleur"
+  prix_kwh: 0.2516
   backup_age_recipient: ""
   backup_hour_local: 3
   backup_volumes: "/config,/share/zigbee2mqtt"
@@ -64,6 +65,7 @@ schema:
   linky_hp_entity: "str"
   linky_tempo_today_entity: "str"
   linky_tempo_tomorrow_entity: "str"
+  prix_kwh: "float"
   backup_age_recipient: "str"
   backup_hour_local: "int(0,23)"
   backup_volumes: "str"

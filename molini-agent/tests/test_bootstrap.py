@@ -272,7 +272,24 @@ async def test_bootstrap_stack_idempotent(mock_supervisor, mock_yaml_patch):
         "frontend:\n"
         "  extra_module_url:\n"
         "    - /local/moli-cards/button-card.js\n"
-        "    - /local/moli-cards/apexcharts-card.js\n",
+        "    - /local/moli-cards/apexcharts-card.js\n"
+        "  themes:\n"
+        "    Moli:\n"
+        "      primary-color: '#1d9e75'\n"
+        "      accent-color: '#f5a623'\n"
+        "      app-header-background-color: '#0E2238'\n"
+        "      app-header-text-color: '#e8eef2'\n"
+        "      primary-background-color: '#0b1a2c'\n"
+        "      secondary-background-color: '#0E2238'\n"
+        "      divider-color: 'rgba(255,255,255,0.08)'\n"
+        "      card-background-color: '#10243a'\n"
+        "      ha-card-background: '#10243a'\n"
+        "      ha-card-border-radius: '16px'\n"
+        "      ha-card-box-shadow: '0 2px 12px rgba(0,0,0,0.35)'\n"
+        "      primary-text-color: '#e8eef2'\n"
+        "      secondary-text-color: '#9fb2c0'\n"
+        "      state-icon-color: '#1d9e75'\n"
+        "      paper-item-icon-color: '#9fb2c0'\n",
         encoding="utf-8",
     )
 

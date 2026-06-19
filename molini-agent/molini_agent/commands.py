@@ -438,6 +438,12 @@ async def execute_rebuild_dashboard(
     panel_cards = panel_detail.build_panel_cards(available or set())
     dyn = {"energie": panel_cards} if panel_cards else None
 
+    prix = getattr(cfg, "prix_kwh", 0.2516) or 0.2516
+    substitutions = {
+        "__PRIX_KWH__": f"{prix:.4f}",
+        "__PRIX_KWH_FR__": f"{prix:.4f}".replace(".", ","),
+    }
+
     # Le builder gère la validation + écriture atomique. Path absolu fixe.
     blocks_dir = os.environ.get(
         "MOLINI_DASHBOARD_BLOCKS_DIR", "/config/dashboards/blocks"
@@ -453,6 +459,7 @@ async def execute_rebuild_dashboard(
             output_path=output_path,
             available_entity_ids=available,
             dynamic_cards=dyn,
+            substitutions=substitutions,
         )
     except (ValueError, FileNotFoundError) as e:
         # ValueError = slug invalide / hors white-list ; FileNotFoundError

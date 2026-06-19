@@ -1,6 +1,7 @@
 title: Accueil
 path: accueil
 icon: mdi:home
+theme: Moli
 cards:
   - type: markdown
     content: >

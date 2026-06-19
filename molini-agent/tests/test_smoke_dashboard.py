@@ -32,6 +32,7 @@ def _fake_config(tmp_path) -> Config:
         linky_hp_entity="sensor.linky_index_hchp",
         linky_tempo_today_entity="sensor.rte_tempo_couleur_actuelle",
         linky_tempo_tomorrow_entity="sensor.rte_tempo_prochaine_couleur",
+        prix_kwh=0.2516,
     )
 
 

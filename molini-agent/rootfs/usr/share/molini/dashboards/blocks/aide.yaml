@@ -1,6 +1,7 @@
 title: Aide
 path: aide
 icon: mdi:lifebuoy
+theme: Moli
 cards:
   - type: markdown
     content: >

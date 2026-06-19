@@ -122,6 +122,27 @@ MOLI_HA_CONFIG_PATCH: dict[str, Any] = {
             "/local/moli-cards/button-card.js",
             "/local/moli-cards/apexcharts-card.js",
         ],
+        # Thème Moli — fond navy de marque, accents vert/ambre, cartes
+        # arrondies. Appliqué par vue via `theme: Moli` dans les blocs.
+        "themes": {
+            "Moli": {
+                "primary-color": "#1d9e75",
+                "accent-color": "#f5a623",
+                "app-header-background-color": "#0E2238",
+                "app-header-text-color": "#e8eef2",
+                "primary-background-color": "#0b1a2c",
+                "secondary-background-color": "#0E2238",
+                "divider-color": "rgba(255,255,255,0.08)",
+                "card-background-color": "#10243a",
+                "ha-card-background": "#10243a",
+                "ha-card-border-radius": "16px",
+                "ha-card-box-shadow": "0 2px 12px rgba(0,0,0,0.35)",
+                "primary-text-color": "#e8eef2",
+                "secondary-text-color": "#9fb2c0",
+                "state-icon-color": "#1d9e75",
+                "paper-item-icon-color": "#9fb2c0",
+            },
+        },
     },
 }
 

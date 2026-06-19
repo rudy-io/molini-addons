@@ -1,6 +1,7 @@
 title: Réglages
 path: reglages
 icon: mdi:cog
+theme: Moli
 cards:
   - type: markdown
     content: >

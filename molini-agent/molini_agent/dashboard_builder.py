@@ -251,6 +251,7 @@ def build_yaml(
     blocks_dir: str | os.PathLike[str] | None = None,
     available_entity_ids: set[str] | None = None,
     dynamic_cards: dict[str, list[dict[str, Any]]] | None = None,
+    substitutions: dict[str, str] | None = None,
 ) -> BuildResult:
     """Assemble la liste de blocs en un dashboard Lovelace complet.
 
@@ -311,6 +312,9 @@ def build_yaml(
     buf.write("\n")
     yaml.dump(doc, buf)
     text = buf.getvalue()
+    if substitutions:
+        for _token, _value in substitutions.items():
+            text = text.replace(_token, _value)
 
     return BuildResult(
         yaml_text=text,
@@ -349,13 +353,14 @@ def build_and_write(
     output_path: str | os.PathLike[str] = DEFAULT_OUTPUT_PATH,
     available_entity_ids: set[str] | None = None,
     dynamic_cards: dict[str, list[dict[str, Any]]] | None = None,
+    substitutions: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Pipeline complet : validate → build → write atomic.
 
     Utilisé par le handler ``rebuild_dashboard`` de l'agent. Renvoie un
     dict sérialisable pour le résultat de la commande admin.
     """
-    result = build_yaml(blocks, blocks_dir=blocks_dir, available_entity_ids=available_entity_ids, dynamic_cards=dynamic_cards)
+    result = build_yaml(blocks, blocks_dir=blocks_dir, available_entity_ids=available_entity_ids, dynamic_cards=dynamic_cards, substitutions=substitutions)
     changed = write_yaml_atomic(result.yaml_text, output_path)
     return {
         "ok": True,

@@ -359,6 +359,23 @@ def test_assembled_yaml_is_valid_lovelace():
         assert "cards" in view
 
 
+def test_build_yaml_substitutions(tmp_path):
+    """build_yaml avec substitutions= remplace les tokens dans le YAML final."""
+    blocks_dir = tmp_path / "blocks"
+    blocks_dir.mkdir()
+    (blocks_dir / "_header.yaml").write_text(
+        "title: T\npath: t\ncards:\n  - type: markdown\n    content: \"prix __PRIX_KWH__\"\n",
+        encoding="utf-8",
+    )
+    result = build_yaml(
+        ["_header"],
+        blocks_dir=blocks_dir,
+        substitutions={"__PRIX_KWH__": "0.3000"},
+    )
+    assert "0.3000" in result.yaml_text
+    assert "__PRIX_KWH__" not in result.yaml_text
+
+
 import io
 from ruamel.yaml import YAML
 from molini_agent import dashboard_builder as db

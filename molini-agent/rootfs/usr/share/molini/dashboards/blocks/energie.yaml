@@ -1,6 +1,7 @@
 title: Énergie
 path: energie
 icon: mdi:solar-power
+theme: Moli
 type: sections
 max_columns: 1
 sections:
@@ -58,7 +59,7 @@ sections:
         content: >
           ⚡ **Produit aujourd'hui :** {{ states('sensor.molini_solaire_production_aujourd_hui')
           }} kWh — soit ~**{{ (states('sensor.molini_solaire_production_aujourd_hui') | float(0)
-          * 0.2516) | round(2) }} €** économisés sur votre facture.
+          * __PRIX_KWH__) | round(2) }} €** économisés sur votre facture *(tarif __PRIX_KWH_FR__ €/kWh)*.
 
   - type: grid
     cards:
