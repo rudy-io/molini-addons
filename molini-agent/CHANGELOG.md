@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.2 — 2026-06-19 (MAJ de l'agent à distance, sans toucher la box)
+
+- **`store_reload`** (`POST /store/reload`) ajouté au `supervisor_client` : rafraîchit le catalogue du store → rend visible une version fraîchement poussée. C'est la brique qui manquait pour mettre à jour sans « Vérifier les MAJ » manuel.
+- Commande **`agent_self_update`** : `store_reload` → `addons/self/info` → `addon_update` sur soi si une MAJ existe. MAJ du plugin Moli **100 % à distance** (le superviseur stoppe+update l'add-on ; le résultat de commande peut remonter en échec — la **vraie** confirmation est le heartbeat suivant qui annonce la nouvelle version).
+- Commande **`enable_auto_update`** : pose `auto_update: true` sur l'add-on (MAJ posées par le superviseur sans même une commande).
+- `stack_update` rafraîchit désormais le store avant de chercher les MAJ.
+- Requiert `hassio_role: manager` (déjà en place) ; basculer en `admin` si `/store/reload` refuse le rôle manager.
+
 ## 0.8.1 — 2026-06-19 (redesign écran énergie : jauges + panneaux remplis)
 
 - **Jauges demi-cercle** pour la production et la consommation (la conso s'affiche « non suivie » tant que le capteur Linky TIC standard n'existe pas).

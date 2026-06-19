@@ -147,6 +147,9 @@ async def execute_stack_update(payload: dict[str, Any] | None) -> dict[str, Any]
     if services and not isinstance(services, list):
         raise RuntimeError("invalid `services` (expected list)")
 
+    # Rafraîchit le store pour voir les versions fraîchement poussées (sinon
+    # update_available reste sur le dernier cache).
+    await supervisor_client.store_reload()
     addons = await supervisor_client.addons_list()
     updated: list[str] = []
     skipped: list[str] = []
@@ -167,6 +170,39 @@ async def execute_stack_update(payload: dict[str, Any] | None) -> dict[str, Any]
             skipped.append(f"{slug} (error)")
 
     return {"updated": updated, "skipped": skipped}
+
+
+async def execute_agent_self_update() -> dict[str, Any]:
+    """Met à jour l'agent Moli LUI-MÊME, à distance, sans toucher la box.
+
+    1. ``store_reload`` → rend visible la version poussée sur le repo.
+    2. ``self/info`` → notre version + version_latest + update_available.
+    3. Si MAJ dispo, ``addon_update`` sur notre slug : le superviseur
+       stoppe+update+redémarre l'add-on → notre process meurt en cours d'appel.
+       Le résultat de commande peut donc remonter en échec ; la **vraie**
+       confirmation est le heartbeat suivant annonçant la nouvelle version.
+    """
+    await supervisor_client.store_reload()
+    info = await supervisor_client.self_info()
+    current = info.get("version")
+    latest = info.get("version_latest")
+    if not info.get("update_available"):
+        return {"updated": False, "version": current, "latest": latest, "note": "already latest"}
+    slug = info.get("slug")
+    await supervisor_client.addon_update(slug)
+    return {"updating": True, "slug": slug, "from": current, "to": latest}
+
+
+async def execute_enable_auto_update() -> dict[str, Any]:
+    """Active l'auto-update du superviseur sur l'agent (MAJ posées sans commande).
+
+    Combiné au refresh périodique du store côté HA, l'add-on se met à jour seul
+    quand une nouvelle version paraît.
+    """
+    info = await supervisor_client.self_info()
+    slug = info.get("slug")
+    await supervisor_client.addon_set_auto_update(slug, True)
+    return {"slug": slug, "auto_update": True}
 
 
 async def _find_cloudflared_slug() -> str | None:
@@ -433,6 +469,8 @@ HANDLERS = {
     "agent_restart": lambda cfg, payload: execute_agent_restart(),
     "agent_update": lambda cfg, payload: execute_agent_update(cfg),
     "stack_update": lambda cfg, payload: execute_stack_update(payload),
+    "agent_self_update": lambda cfg, payload: execute_agent_self_update(),
+    "enable_auto_update": lambda cfg, payload: execute_enable_auto_update(),
     "tunnel_install": lambda cfg, payload: execute_tunnel_install(payload),
     "tunnel_uninstall": lambda cfg, payload: execute_tunnel_uninstall(payload),
     "ha_provision": lambda cfg, payload: execute_ha_provision(cfg),

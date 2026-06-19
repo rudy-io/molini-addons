@@ -109,3 +109,32 @@ async def store_addons_list() -> list[dict[str, Any]]:
 async def store_info() -> dict[str, Any]:
     """Renvoie le contenu complet du store (addons + repositories)."""
     return (await _get("/store")).get("data") or {}
+
+
+async def store_reload() -> dict[str, Any]:
+    """Recharge le catalogue du store (git-pull des repos add-on).
+
+    Indispensable pour *voir* une nouvelle version d'un add-on poussée sur son
+    repo : sans ça, ``update_available`` reste sur le dernier cache. C'est la
+    brique qui manquait pour mettre à jour à distance sans « Vérifier les MAJ »
+    manuel. Nécessite ``hassio_role: manager`` (au moins) sur l'add-on appelant.
+    """
+    return await _post("/store/reload")
+
+
+async def self_info() -> dict[str, Any]:
+    """Info de NOTRE propre add-on via l'alias ``self`` du superviseur.
+
+    Renvoie au minimum ``slug`` / ``version`` / ``version_latest`` /
+    ``update_available`` — sans avoir à résoudre le slug préfixé par le repo.
+    """
+    return (await _get("/addons/self/info")).get("data") or {}
+
+
+async def addon_set_auto_update(slug: str, value: bool) -> dict[str, Any]:
+    """Active/désactive l'auto-update d'un add-on.
+
+    ``auto_update`` est un réglage superviseur top-level (PAS dans ``options``)
+    — d'où un POST distinct de ``addon_options``.
+    """
+    return await _post(f"/addons/{slug}/options", json={"auto_update": value})
