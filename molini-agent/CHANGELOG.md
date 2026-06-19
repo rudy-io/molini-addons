@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.3 — 2026-06-19 (release de validation : MAJ à distance)
+
+- Bump de version (sans changement de code) pour **valider de bout en bout le self-update à distance** (`agent_self_update` : `store_reload` → `addon_update` sur soi) sur la box pilote, sans aucune action manuelle sur la box.
+
 ## 0.8.2 — 2026-06-19 (MAJ de l'agent à distance, sans toucher la box)
 
 - **`store_reload`** (`POST /store/reload`) ajouté au `supervisor_client` : rafraîchit le catalogue du store → rend visible une version fraîchement poussée. C'est la brique qui manquait pour mettre à jour sans « Vérifier les MAJ » manuel.
