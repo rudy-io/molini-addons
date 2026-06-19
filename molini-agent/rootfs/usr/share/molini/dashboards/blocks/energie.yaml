@@ -21,13 +21,13 @@ sections:
             name: Production
             needle: true
             min: 0
-            max: 5000
+            max: 6000
             segments:
               - from: 0
                 color: "#5f5e5a"
-              - from: 1200
+              - from: 2000
                 color: "#ba7517"
-              - from: 3000
+              - from: 4000
                 color: "#1d9e75"
 
           # Jauge consommation — visible dès que le capteur existe (Linky TIC
@@ -46,13 +46,13 @@ sections:
               name: Consommation
               needle: true
               min: 0
-              max: 6000
+              max: 9000
               segments:
                 - from: 0
                   color: "#1d9e75"
-                - from: 2000
+                - from: 3000
                   color: "#ba7517"
-                - from: 4000
+                - from: 6000
                   color: "#e24b4a"
 
       - type: markdown

@@ -17,7 +17,8 @@ _PV_RE = re.compile(r"^(?P<prefix>.+?)_pv(?P<n>\d+)(?:_power)?$")
 # Onduleur string SolarMan : sensor.inverter, sensor.inverter_2, …
 _SOLARMAN_RE = re.compile(r"(?:^|\.)inverter(?:_\d+)?$")
 
-PANEL_MAX_W = 400  # borne haute d'un string résidentiel, pour le % de remplissage
+PANEL_MAX_W = 600  # borne haute d'un string résidentiel, pour le % de remplissage
+# (mesuré chez Carole : strings SolarMan ~430 W / IzyPower ~460 W au pic — 400 saturait)
 
 
 def detect_panels(entity_ids: set[str]) -> dict[str, list[str]]:

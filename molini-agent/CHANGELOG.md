@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0
+
+- Jauges et remplissage panneaux : plafonds relevés (mesurés sur la vraie installation de Carole). Jauge **Production** max 5000 → **6000 W** (elle saturait : pic du jour ~5200 W), jauge **Consommation** max 6000 → **9000 W**, remplissage **par panneau** `PANEL_MAX_W` 400 → **600 W** (strings SolarMan ~430 W / IzyPower ~460 W au pic). Segments des jauges ré-échelonnés en conséquence.
+
 ## 0.9.0
 
 - Prix de l'électricité configurable (option `prix_kwh`, défaut 0.2516 €/kWh) : le champ « € économisés » du dashboard utilise désormais le vrai tarif du client (substitution `__PRIX_KWH__` à la génération du dashboard).
