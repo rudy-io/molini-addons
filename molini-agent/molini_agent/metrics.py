@@ -3,6 +3,7 @@ from typing import Any, Optional
 
 import psutil
 
+from . import capacities
 from .config import Config
 from .ha_client import HAClient
 from .service_status import collect_services
@@ -63,6 +64,14 @@ async def collect_metrics(cfg: Config, ha: HAClient) -> dict[str, Any]:
         zigbee_devices.discard(None)
         if zigbee_devices:
             metrics["ha_zigbee_devices_count"] = len(zigbee_devices)
+
+        # High-water-mark des capacités PV pour l'auto-calibrage du dashboard
+        # (jauge prod + remplissage panneaux). Réutilise les états déjà fetchés
+        # — aucun appel HA supplémentaire. Best-effort, jamais bloquant.
+        try:
+            capacities.update_from_states(states)
+        except Exception:  # noqa: BLE001
+            pass
 
     # Linky — n'inclut la clé que si la valeur est exploitable
     power_state = await ha.get_state(cfg.linky_power_entity)

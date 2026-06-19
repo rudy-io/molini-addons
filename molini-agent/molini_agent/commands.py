@@ -24,7 +24,7 @@ from typing import Any
 
 import httpx
 
-from . import panel_detail, supervisor_client
+from . import capacities, panel_detail, supervisor_client
 from .backup import run_backup_once
 from .bootstrap import (
     ALLOWED_ADDON_NAMES,
@@ -440,12 +440,16 @@ async def execute_rebuild_dashboard(
         panel_detail.panel_entity_ids(available or set())
         + ["sensor.molini_solaire_production"]
     )
+    # Auto-calibrage : high-water-mark persisté (alimenté en continu par le
+    # heartbeat) + seed historique court — le recorder HA ne garde que ~2 j, donc
+    # une fenêtre plus longue renvoie vide (sinon on retomberait sur les planchers).
     sensor_maxes: dict[str, float] = {}
     ha = HAClient(cfg.ha_url, cfg.ha_token)
     try:
-        sensor_maxes = await ha.sensor_max_over(meter_ids, days=14)
+        observed = await ha.sensor_max_over(meter_ids, days=2)
+        sensor_maxes = capacities.update_from_maxes(observed)
     except Exception:  # noqa: BLE001
-        pass
+        sensor_maxes = capacities.load_capacities()
     finally:
         await ha.close()
 

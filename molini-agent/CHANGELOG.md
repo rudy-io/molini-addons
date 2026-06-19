@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.1
+
+- Fix de l'auto-calibrage 0.11.0 : l'historique HA ne remonte en pratique que **~2 j** (le recorder purge au-delà → requête vide), donc le calibrage retombait sur les **planchers** (3000 W / 450). Désormais le **pic max-ever est mémorisé** dans un store persisté `/config/.moli_capacities.json`, **alimenté en continu par le heartbeat** (toutes les 5 min, depuis les états déjà lus — aucun appel HA en plus) + seedé par une fenêtre historique courte (2 j) au rebuild. Le calibrage ne perd plus jamais le pic réel observé.
+
 ## 0.11.0
 
 - Jauge production et remplissage des panneaux **auto-calibrés sur la capacité réelle** de chaque installation : le plafond = pic observé (historique 14 j) + 10 % de marge, avec planchers de sécurité (prod 3000 W, panneau 450 W). Chaque panneau se remplit par rapport à SON propre pic. Fini les valeurs en dur. (jauge conso inchangée pour l'instant — pas de données conso.)
