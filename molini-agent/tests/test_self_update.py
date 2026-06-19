@@ -33,9 +33,10 @@ def _fake_ha(monkeypatch, states, call_service):
 
 
 @pytest.mark.asyncio
-async def test_self_update_calls_update_install_when_available(monkeypatch):
-    # La décision se base sur la vue FRAÎCHE du superviseur (self_info), pas sur
-    # l'attribut latest_version de l'entité update.* (qui peut traîner).
+async def test_self_update_refreshes_entity_then_installs(monkeypatch):
+    # Décision via la vue fraîche du superviseur ; puis on RAFRAÎCHIT l'entité
+    # update (qui lague) avant update.install, sinon install = no-op.
+    monkeypatch.setattr(commands.asyncio, "sleep", AsyncMock())
     _patch(monkeypatch, "store_reload", AsyncMock(return_value={}))
     _patch(
         monkeypatch,
@@ -43,8 +44,8 @@ async def test_self_update_calls_update_install_when_available(monkeypatch):
         AsyncMock(
             return_value={
                 "name": "Moli Agent",
-                "version": "0.8.4",
-                "version_latest": "0.8.5",
+                "version": "0.8.7",
+                "version_latest": "0.8.8",
                 "update_available": True,
             }
         ),
@@ -59,10 +60,19 @@ async def test_self_update_calls_update_install_when_available(monkeypatch):
     res = await commands.execute_agent_self_update(_cfg())
 
     commands.supervisor_client.store_reload.assert_awaited()
-    call.assert_awaited_once_with("update", "install", {"entity_id": "update.moli_agent_update"})
+    # rafraîchit l'entité PUIS installe, dans cet ordre
+    assert call.await_args_list[0].args == (
+        "homeassistant",
+        "update_entity",
+        {"entity_id": "update.moli_agent_update"},
+    )
+    assert call.await_args_list[1].args == (
+        "update",
+        "install",
+        {"entity_id": "update.moli_agent_update"},
+    )
     assert res["updating"] is True
-    assert res["from"] == "0.8.4"
-    assert res["to"] == "0.8.5"
+    assert res["to"] == "0.8.8"
 
 
 @pytest.mark.asyncio

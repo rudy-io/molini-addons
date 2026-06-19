@@ -11,47 +11,54 @@ sections:
         heading_style: title
         icon: mdi:solar-power
 
-      - type: gauge
-        entity: sensor.molini_solaire_production
-        name: Production
-        needle: true
-        min: 0
-        max: 5000
-        segments:
-          - from: 0
-            color: "#5f5e5a"
-          - from: 1200
-            color: "#ba7517"
-          - from: 3000
-            color: "#1d9e75"
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: gauge
+            entity: sensor.molini_solaire_production
+            name: Production
+            needle: true
+            min: 0
+            max: 5000
+            segments:
+              - from: 0
+                color: "#5f5e5a"
+              - from: 1200
+                color: "#ba7517"
+              - from: 3000
+                color: "#1d9e75"
 
-      - type: conditional
-        conditions:
-          - condition: state
-            entity: sensor.molini_consommation_maison
-            state_not: unavailable
-          - condition: state
-            entity: sensor.molini_consommation_maison
-            state_not: unknown
-        card:
-          type: gauge
-          entity: sensor.molini_consommation_maison
-          name: Consommation
-          needle: true
-          min: 0
-          max: 6000
-          segments:
-            - from: 0
-              color: "#1d9e75"
-            - from: 2000
-              color: "#ba7517"
-            - from: 4000
-              color: "#e24b4a"
+          # Jauge consommation — visible dès que le capteur existe (Linky TIC
+          # standard). Tant qu'il est absent, la jauge est simplement masquée.
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: sensor.molini_consommation_maison
+                state_not: unavailable
+              - condition: state
+                entity: sensor.molini_consommation_maison
+                state_not: unknown
+            card:
+              type: gauge
+              entity: sensor.molini_consommation_maison
+              name: Consommation
+              needle: true
+              min: 0
+              max: 6000
+              segments:
+                - from: 0
+                  color: "#1d9e75"
+                - from: 2000
+                  color: "#ba7517"
+                - from: 4000
+                  color: "#e24b4a"
 
-      - type: entities
-        entities:
-          - entity: sensor.molini_solaire_production_aujourd_hui
-            name: Produit aujourd'hui
+      - type: markdown
+        content: >
+          ⚡ **Produit aujourd'hui :** {{ states('sensor.molini_solaire_production_aujourd_hui')
+          }} kWh — soit ~**{{ (states('sensor.molini_solaire_production_aujourd_hui') | float(0)
+          * 0.2516) | round(2) }} €** économisés sur votre facture.
 
   - type: grid
     cards:
@@ -77,10 +84,6 @@ sections:
             name: Production
             type: area
             color: "#1d9e75"
-          - entity: sensor.molini_consommation_maison
-            name: Consommation
-            type: area
-            color: "#378add"
 
   - type: grid
     cards:

@@ -219,8 +219,15 @@ async def execute_agent_self_update(cfg: Config) -> dict[str, Any]:
         )
         if entity is None:
             return {"updated": False, "note": f"update entity introuvable pour '{name}'"}
-        await ha.call_service("update", "install", {"entity_id": entity["entity_id"]})
-        return {"updating": True, "entity": entity["entity_id"], "from": current, "to": latest}
+        eid = entity["entity_id"]
+        # L'attribut latest_version de l'entité update lague (~1j) : sans la
+        # rafraîchir, update.install ré-installe la version périmée (= no-op,
+        # constaté en 0.8.7). On force la MAJ de l'entité depuis le superviseur
+        # AVANT d'installer.
+        await ha.call_service("homeassistant", "update_entity", {"entity_id": eid})
+        await asyncio.sleep(5)
+        await ha.call_service("update", "install", {"entity_id": eid})
+        return {"updating": True, "entity": eid, "from": current, "to": latest}
     finally:
         await ha.close()
 

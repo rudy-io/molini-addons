@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.8 — 2026-06-19 (fix update on-demand + retouches dashboard)
+
+- **Fix `agent_self_update`** : on **rafraîchit l'entité update** (`homeassistant.update_entity`) AVANT `update.install`. Sans ça, `update.install` réinstalle la version périmée que l'entité croit être la dernière (= no-op, constaté en 0.8.7). Devrait débloquer la MAJ on-demand à distance.
+- **Dashboard** : panneaux button-card avec **icône** + style amélioré ; jauges **production/consommation côte à côte** (2 colonnes ; conso visible dès que le capteur existe) ; « Produit aujourd'hui » affiche les **€ économisés** (prix 0,2516 €/kWh par défaut — à rendre configurable) ; **apexcharts en production seule** (ne plante plus sur le capteur conso absent).
+
 ## 0.8.7 — 2026-06-19 (dashboard énergie natif full HA — sections + button-card + apexcharts)
 
 - **Bloc `energie.yaml` en vue `sections`** (corrige le scramble masonry) : jauges natives production/consommation, détail par panneau, courbe 24 h, compteur.
