@@ -1,10 +1,12 @@
-"""Tests de la MAJ à distance de l'agent Moli (store_reload + self-update).
+"""Tests de la MAJ à distance de l'agent Moli.
 
-Le but : pouvoir mettre à jour le plugin depuis le central, sans toucher la box.
-On mocke ``supervisor_client`` — la logique testée est dans ``commands``.
+Le superviseur interdit à un add-on de s'updater en direct → on passe par le
+service HA Core ``update.install``. On mocke ``supervisor_client`` (store_reload,
+self_info) et ``HAClient`` (states, call_service).
 """
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -16,55 +18,74 @@ def _patch(monkeypatch, name, mock):
     monkeypatch.setattr(commands.supervisor_client, name, mock, raising=False)
 
 
-@pytest.mark.asyncio
-async def test_self_update_reloads_store_then_updates_when_available(monkeypatch):
-    reload = AsyncMock(return_value={})
-    info = AsyncMock(
-        return_value={
-            "slug": "abc1234_molini_agent",
-            "version": "0.8.2",
-            "version_latest": "0.8.3",
-            "update_available": True,
-        }
+def _cfg():
+    return SimpleNamespace(ha_url="http://supervisor/core", ha_token="tok")
+
+
+def _fake_ha(monkeypatch, states, call_service):
+    fake = SimpleNamespace(
+        states=AsyncMock(return_value=states),
+        call_service=call_service,
+        close=AsyncMock(),
     )
-    update = AsyncMock(return_value={})
-    _patch(monkeypatch, "store_reload", reload)
-    _patch(monkeypatch, "self_info", info)
-    _patch(monkeypatch, "addon_update", update)
+    monkeypatch.setattr(commands, "HAClient", lambda *a, **k: fake)
+    return fake
 
-    res = await commands.execute_agent_self_update()
 
-    # le store est rafraîchi AVANT de regarder la version (sinon on rate la MAJ)
-    reload.assert_awaited_once()
-    update.assert_awaited_once_with("abc1234_molini_agent")
+@pytest.mark.asyncio
+async def test_self_update_calls_update_install_when_available(monkeypatch):
+    _patch(monkeypatch, "store_reload", AsyncMock(return_value={}))
+    _patch(monkeypatch, "self_info", AsyncMock(return_value={"name": "Moli Agent"}))
+    call = AsyncMock(return_value=True)
+    states = [
+        {
+            "entity_id": "update.autre_chose",
+            "attributes": {"title": "Autre", "installed_version": "1", "latest_version": "1"},
+        },
+        {
+            "entity_id": "update.moli_agent_update",
+            "attributes": {
+                "title": "Moli Agent",
+                "installed_version": "0.8.3",
+                "latest_version": "0.8.4",
+            },
+        },
+    ]
+    _fake_ha(monkeypatch, states, call)
+
+    res = await commands.execute_agent_self_update(_cfg())
+
+    # le store est rafraîchi d'abord
+    commands.supervisor_client.store_reload.assert_awaited_once()
+    # MAJ déclenchée via HA Core, sur la bonne entité
+    call.assert_awaited_once_with("update", "install", {"entity_id": "update.moli_agent_update"})
     assert res["updating"] is True
-    assert res["from"] == "0.8.2"
-    assert res["to"] == "0.8.3"
+    assert res["from"] == "0.8.3"
+    assert res["to"] == "0.8.4"
 
 
 @pytest.mark.asyncio
 async def test_self_update_skips_when_already_latest(monkeypatch):
     _patch(monkeypatch, "store_reload", AsyncMock(return_value={}))
-    _patch(
-        monkeypatch,
-        "self_info",
-        AsyncMock(
-            return_value={
-                "slug": "x_molini_agent",
-                "version": "0.8.3",
-                "version_latest": "0.8.3",
-                "update_available": False,
-            }
-        ),
-    )
-    update = AsyncMock()
-    _patch(monkeypatch, "addon_update", update)
+    _patch(monkeypatch, "self_info", AsyncMock(return_value={"name": "Moli Agent"}))
+    call = AsyncMock()
+    states = [
+        {
+            "entity_id": "update.moli_agent_update",
+            "attributes": {
+                "title": "Moli Agent",
+                "installed_version": "0.8.4",
+                "latest_version": "0.8.4",
+            },
+        },
+    ]
+    _fake_ha(monkeypatch, states, call)
 
-    res = await commands.execute_agent_self_update()
+    res = await commands.execute_agent_self_update(_cfg())
 
-    update.assert_not_called()
+    call.assert_not_called()
     assert res["updated"] is False
-    assert res["version"] == "0.8.3"
+    assert res["version"] == "0.8.4"
 
 
 @pytest.mark.asyncio

@@ -46,3 +46,18 @@ class HAClient:
             return r.json()
         except httpx.HTTPError:
             return None
+
+    async def call_service(self, domain: str, service: str, data: dict[str, Any]) -> bool:
+        """Appelle un service HA Core (POST /api/services/<domain>/<service>).
+
+        Best-effort : True si 2xx, False sinon — ne lève jamais. Utilisé entre
+        autres pour ``update.install`` (MAJ de l'add-on déclenchée par HA Core,
+        seul acteur autorisé à updater un add-on — l'add-on ne peut pas le faire
+        lui-même côté superviseur).
+        """
+        try:
+            r = await self._client.post(f"/api/services/{domain}/{service}", json=data)
+            r.raise_for_status()
+            return True
+        except httpx.HTTPError:
+            return False

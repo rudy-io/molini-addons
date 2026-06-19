@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.4 — 2026-06-19 (fix MAJ à distance : update.install via HA Core)
+
+- **Fix `agent_self_update`** : le superviseur **interdit à un add-on de s'updater en direct** (`POST /addons/self/update` → 403 « can't update itself », constaté en validation 0.8.3). On déclenche désormais la MAJ via le service HA Core **`update.install`** sur l'entité `update.*` de l'add-on (retrouvée par son `title`) — HA Core est l'acteur, donc autorisé. C'est le mécanisme de la 0.5.1, automatisé.
+- **`HAClient.call_service`** ajouté (POST `/api/services/<domain>/<service>`, best-effort).
+- `store_reload` (validé OK avec le rôle `manager`) reste appelé d'abord pour rendre la nouvelle version visible.
+
 ## 0.8.3 — 2026-06-19 (release de validation : MAJ à distance)
 
 - Bump de version (sans changement de code) pour **valider de bout en bout le self-update à distance** (`agent_self_update` : `store_reload` → `addon_update` sur soi) sur la box pilote, sans aucune action manuelle sur la box.

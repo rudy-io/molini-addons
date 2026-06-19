@@ -172,25 +172,47 @@ async def execute_stack_update(payload: dict[str, Any] | None) -> dict[str, Any]
     return {"updated": updated, "skipped": skipped}
 
 
-async def execute_agent_self_update() -> dict[str, Any]:
+async def execute_agent_self_update(cfg: Config) -> dict[str, Any]:
     """Met à jour l'agent Moli LUI-MÊME, à distance, sans toucher la box.
 
+    Le superviseur INTERDIT à un add-on de s'updater en direct
+    (``POST /addons/self/update`` → 403 « can't update itself »). On passe donc
+    par le service HA Core ``update.install`` sur l'entité update de notre
+    add-on : c'est HA Core l'acteur → autorisé (mécanisme de la 0.5.1, automatisé).
+
     1. ``store_reload`` → rend visible la version poussée sur le repo.
-    2. ``self/info`` → notre version + version_latest + update_available.
-    3. Si MAJ dispo, ``addon_update`` sur notre slug : le superviseur
-       stoppe+update+redémarre l'add-on → notre process meurt en cours d'appel.
-       Le résultat de commande peut donc remonter en échec ; la **vraie**
+    2. on retrouve l'entité ``update.*`` de notre add-on (par son ``title``).
+    3. si ``latest_version`` > installée → ``update.install`` via HA Core. Le
+       superviseur stoppe l'agent pour l'updater → notre process meurt ; la vraie
        confirmation est le heartbeat suivant annonçant la nouvelle version.
     """
     await supervisor_client.store_reload()
     info = await supervisor_client.self_info()
-    current = info.get("version")
-    latest = info.get("version_latest")
-    if not info.get("update_available"):
-        return {"updated": False, "version": current, "latest": latest, "note": "already latest"}
-    slug = info.get("slug")
-    await supervisor_client.addon_update(slug)
-    return {"updating": True, "slug": slug, "from": current, "to": latest}
+    name = info.get("name") or "Moli Agent"
+
+    ha = HAClient(cfg.ha_url, cfg.ha_token)
+    try:
+        states = await ha.states()
+        entity = next(
+            (
+                s
+                for s in (states or [])
+                if s.get("entity_id", "").startswith("update.")
+                and (s.get("attributes") or {}).get("title") == name
+            ),
+            None,
+        )
+        if entity is None:
+            return {"updated": False, "note": f"update entity introuvable pour '{name}'"}
+        attrs = entity.get("attributes") or {}
+        installed = attrs.get("installed_version")
+        latest = attrs.get("latest_version")
+        if not latest or latest == installed:
+            return {"updated": False, "version": installed, "note": "already latest"}
+        await ha.call_service("update", "install", {"entity_id": entity["entity_id"]})
+        return {"updating": True, "entity": entity["entity_id"], "from": installed, "to": latest}
+    finally:
+        await ha.close()
 
 
 async def execute_enable_auto_update() -> dict[str, Any]:
@@ -469,7 +491,7 @@ HANDLERS = {
     "agent_restart": lambda cfg, payload: execute_agent_restart(),
     "agent_update": lambda cfg, payload: execute_agent_update(cfg),
     "stack_update": lambda cfg, payload: execute_stack_update(payload),
-    "agent_self_update": lambda cfg, payload: execute_agent_self_update(),
+    "agent_self_update": lambda cfg, payload: execute_agent_self_update(cfg),
     "enable_auto_update": lambda cfg, payload: execute_enable_auto_update(),
     "tunnel_install": lambda cfg, payload: execute_tunnel_install(payload),
     "tunnel_uninstall": lambda cfg, payload: execute_tunnel_uninstall(payload),
