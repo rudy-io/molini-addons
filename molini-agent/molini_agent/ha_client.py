@@ -5,9 +5,13 @@ Sous Debian autonome, on tape ``http://localhost:8123/api/*`` avec un
 Long-Lived Access Token. Les deux modes utilisent la même interface — c'est
 ``run.sh`` qui pose la bonne valeur dans ``HA_URL`` / ``HA_TOKEN``.
 """
+import logging
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import httpx
+
+log = logging.getLogger("molini_agent.ha_client")
 
 
 class HAClient:
@@ -61,3 +65,47 @@ class HAClient:
             return True
         except httpx.HTTPError:
             return False
+
+    async def sensor_max_over(
+        self, entity_ids: list[str], days: int = 14
+    ) -> dict[str, float]:
+        """Max observé (W) par capteur sur les `days` derniers jours (best-effort).
+        Recorder = 14 j chez Moli, donc fenêtre <= 14 j utile. Renvoie {} sur erreur."""
+        if not entity_ids:
+            return {}
+        start = datetime.now(timezone.utc) - timedelta(days=days)
+        url = (
+            "/api/history/period/"
+            + start.isoformat()
+            + "?filter_entity_id="
+            + ",".join(entity_ids)
+            + "&minimal_response&significant_changes_only"
+        )
+        try:
+            r = await self._client.get(url)
+            if r.status_code != 200:
+                log.warning(
+                    "sensor_max_over: HA history returned %s", r.status_code
+                )
+                return {}
+            payload = r.json()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("sensor_max_over: request failed: %s", exc)
+            return {}
+        result: dict[str, float] = {}
+        for series in payload:
+            if not isinstance(series, list) or not series:
+                continue
+            pts = series
+            eid = pts[0].get("entity_id")
+            if not eid:
+                continue
+            values: list[float] = []
+            for p in pts:
+                try:
+                    values.append(float(p["state"]))
+                except (KeyError, TypeError, ValueError):
+                    pass
+            if values:
+                result[eid] = max(values)
+        return result

@@ -1,4 +1,5 @@
 # molini-agent/tests/test_panel_detail.py
+import pytest
 from molini_agent import panel_detail as pd
 
 CAROLE = {
@@ -57,3 +58,54 @@ def test_build_cards_button_card_fill():
 
 def test_build_cards_empty():
     assert pd.build_panel_cards({"sensor.x"}) == []
+
+
+# ─── Auto-scaling panneaux (B2) ───────────────────────────────────────────────
+
+def test_panel_entity_ids_returns_pv_eids():
+    """panel_entity_ids renvoie la liste plate des entity_ids PV détectés."""
+    eids = pd.panel_entity_ids(CAROLE)
+    # Tous les eids PV de la fixture doivent être présents
+    assert "sensor.inverter_pv1_power" in eids
+    assert "sensor.inverter_pv2_power" in eids
+    assert "sensor.inverter_2_pv1_power" in eids
+    # Le bruit ne doit pas être inclus
+    assert "sensor.light_salon" not in eids
+    assert "sensor.inverter_2_power" not in eids
+    # 9 strings PV au total dans CAROLE (2+4+2+1)
+    assert len(eids) == 9
+
+
+def test_build_cards_with_sensor_maxes_uses_observed_ceiling():
+    """Quand sensor_maxes contient une valeur, le plafond = max * 1.1 (arrondi)."""
+    # On prend un seul panneau PV pour simplifier
+    available = {"sensor.inverter_pv1_power"}
+    eid = "sensor.inverter_pv1_power"
+    # Pic observé = 5000 W → plafond attendu = round(5000 * 1.1) = 5500
+    cards = pd.build_panel_cards(available, sensor_maxes={eid: 5000})
+    grids = [c for c in cards if c.get("type") == "grid"]
+    assert grids, "Aucun grid généré"
+    bg = next(s["background"] for s in grids[0]["cards"][0]["styles"]["card"] if "background" in s)
+    assert "5500" in bg, f"5500 attendu dans le bg, obtenu: {bg}"
+    assert "600" not in bg
+
+
+def test_build_cards_floor_when_no_sensor_maxes():
+    """Sans sensor_maxes, le plancher PANEL_FLOOR_W=450 s'applique."""
+    available = {"sensor.inverter_pv1_power"}
+    cards = pd.build_panel_cards(available, sensor_maxes=None)
+    grids = [c for c in cards if c.get("type") == "grid"]
+    assert grids
+    bg = next(s["background"] for s in grids[0]["cards"][0]["styles"]["card"] if "background" in s)
+    assert "450" in bg, f"450 (plancher) attendu dans le bg, obtenu: {bg}"
+
+
+def test_build_cards_floor_when_sensor_max_below_floor():
+    """Quand le max observé * headroom < PANEL_FLOOR_W, le plancher s'applique."""
+    available = {"sensor.inverter_pv1_power"}
+    eid = "sensor.inverter_pv1_power"
+    # 100 W * 1.1 = 110 → en-dessous du plancher 450 → 450
+    cards = pd.build_panel_cards(available, sensor_maxes={eid: 100})
+    grids = [c for c in cards if c.get("type") == "grid"]
+    bg = next(s["background"] for s in grids[0]["cards"][0]["styles"]["card"] if "background" in s)
+    assert "450" in bg

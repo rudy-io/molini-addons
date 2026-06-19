@@ -17,8 +17,8 @@ _PV_RE = re.compile(r"^(?P<prefix>.+?)_pv(?P<n>\d+)(?:_power)?$")
 # Onduleur string SolarMan : sensor.inverter, sensor.inverter_2, …
 _SOLARMAN_RE = re.compile(r"(?:^|\.)inverter(?:_\d+)?$")
 
-PANEL_MAX_W = 600  # borne haute d'un string résidentiel, pour le % de remplissage
-# (mesuré chez Carole : strings SolarMan ~430 W / IzyPower ~460 W au pic — 400 saturait)
+PANEL_FLOOR_W = 450   # plancher du plafond de remplissage d'un string
+PANEL_HEADROOM = 1.1  # marge au-dessus du pic observé
 
 
 def detect_panels(entity_ids: set[str]) -> dict[str, list[str]]:
@@ -87,17 +87,17 @@ def group_panels(entity_ids: set[str]) -> list[dict[str, Any]]:
     ]
 
 
-# Template button-card : fond qui se remplit par le bas selon la prod (vert,
-# ambre si < 20 %). Pas une f-string → on garde les ${...} JS littéraux.
-_PANEL_BG = (
-    "[[[ const w = Number(entity.state) || 0; "
-    "const pct = Math.min(100, Math.round(w / " + str(PANEL_MAX_W) + " * 100)); "
-    "const c = pct < 20 ? '186,117,23' : '29,158,117'; "
-    "return `linear-gradient(to top, rgba(${c},0.85) ${pct}%, #0e1b2a ${pct}%)`; ]]]"
-)
+def _panel_bg(ceiling_w: int) -> str:
+    # fond qui se remplit par le bas selon la prod (vert, ambre si < 20 %).
+    return (
+        "[[[ const w = Number(entity.state) || 0; "
+        "const pct = Math.min(100, Math.round(w / " + str(ceiling_w) + " * 100)); "
+        "const c = pct < 20 ? '186,117,23' : '29,158,117'; "
+        "return `linear-gradient(to top, rgba(${c},0.85) ${pct}%, #0e1b2a ${pct}%)`; ]]]"
+    )
 
 
-def _panel_card(name: str, eid: str) -> dict[str, Any]:
+def _panel_card(name: str, eid: str, ceiling_w: int) -> dict[str, Any]:
     return {
         "type": "custom:button-card",
         "entity": eid,
@@ -113,7 +113,7 @@ def _panel_card(name: str, eid: str) -> dict[str, Any]:
                 {"border": "1px solid #2a3340"},
                 {"border-radius": "10px"},
                 {"padding": "8px 6px 6px"},
-                {"background": _PANEL_BG},
+                {"background": _panel_bg(ceiling_w)},
                 {"box-shadow": "inset 0 1px 0 rgba(255,255,255,0.06)"},
             ],
             "icon": [{"width": "24px"}, {"color": "rgba(255,255,255,0.92)"}],
@@ -123,7 +123,16 @@ def _panel_card(name: str, eid: str) -> dict[str, Any]:
     }
 
 
-def build_panel_cards(entity_ids: set[str]) -> list[dict[str, Any]]:
+def panel_entity_ids(available: set[str]) -> list[str]:
+    """Liste plate des entity_id de strings PV que build_panel_cards utilisera."""
+    groups = group_panels(available)
+    return [p["eid"] for g in groups for p in g["panels"]]
+
+
+def build_panel_cards(
+    entity_ids: set[str],
+    sensor_maxes: dict[str, float] | None = None,
+) -> list[dict[str, Any]]:
     """Cartes du détail par panneau : par installation, une grille de panneaux
     qui se remplissent. [] si aucun PV détecté."""
     groups = group_panels(entity_ids)
@@ -132,10 +141,18 @@ def build_panel_cards(entity_ids: set[str]) -> list[dict[str, Any]]:
     cards: list[dict[str, Any]] = []
     for g in groups:
         cards.append({"type": "heading", "heading": g["label"], "heading_style": "subtitle"})
+        panel_cards = []
+        for p in g["panels"]:
+            eid = p["eid"]
+            ceiling = max(
+                int(round((sensor_maxes or {}).get(eid, 0) * PANEL_HEADROOM)),
+                PANEL_FLOOR_W,
+            )
+            panel_cards.append(_panel_card(p["name"], eid, ceiling))
         cards.append({
             "type": "grid",
             "columns": 3,
             "square": False,
-            "cards": [_panel_card(p["name"], p["eid"]) for p in g["panels"]],
+            "cards": panel_cards,
         })
     return cards

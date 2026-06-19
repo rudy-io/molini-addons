@@ -33,7 +33,7 @@ from .bootstrap import (
     patch_ha_config as bootstrap_patch_ha_config,
 )
 from .config import Config
-from .dashboard_builder import build_and_write
+from .dashboard_builder import build_and_write, prod_gauge_scale
 from .ha_client import HAClient
 from .ha_discovery import execute_ha_provision
 
@@ -435,13 +435,34 @@ async def execute_rebuild_dashboard(
 
     available = await _ha_available_entity_ids(cfg)
 
-    panel_cards = panel_detail.build_panel_cards(available or set())
+    # Récupération des maxes observés pour auto-calibrer les plafonds de jauge/panneaux.
+    meter_ids = (
+        panel_detail.panel_entity_ids(available or set())
+        + ["sensor.molini_solaire_production"]
+    )
+    sensor_maxes: dict[str, float] = {}
+    ha = HAClient(cfg.ha_url, cfg.ha_token)
+    try:
+        sensor_maxes = await ha.sensor_max_over(meter_ids, days=14)
+    except Exception:  # noqa: BLE001
+        pass
+    finally:
+        await ha.close()
+
+    panel_cards = panel_detail.build_panel_cards(available or set(), sensor_maxes=sensor_maxes)
     dyn = {"energie": panel_cards} if panel_cards else None
+
+    gmax, gseg1, gseg2 = prod_gauge_scale(
+        sensor_maxes.get("sensor.molini_solaire_production", 0.0)
+    )
 
     prix = getattr(cfg, "prix_kwh", 0.2516) or 0.2516
     substitutions = {
-        "__PRIX_KWH__": f"{prix:.4f}",
         "__PRIX_KWH_FR__": f"{prix:.4f}".replace(".", ","),
+        "__PRIX_KWH__": f"{prix:.4f}",
+        "__PROD_MAX__": str(gmax),
+        "__PROD_SEG1__": str(gseg1),
+        "__PROD_SEG2__": str(gseg2),
     }
 
     # Le builder gère la validation + écriture atomique. Path absolu fixe.

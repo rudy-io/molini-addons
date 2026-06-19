@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.11.0
+
+- Jauge production et remplissage des panneaux **auto-calibrés sur la capacité réelle** de chaque installation : le plafond = pic observé (historique 14 j) + 10 % de marge, avec planchers de sécurité (prod 3000 W, panneau 450 W). Chaque panneau se remplit par rapport à SON propre pic. Fini les valeurs en dur. (jauge conso inchangée pour l'instant — pas de données conso.)
+- Fix : ordre de substitution des tokens (`__PRIX_KWH__` était un préfixe de `__PRIX_KWH_FR__` → tarif affiché cassé). Substitution désormais des tokens les plus longs d'abord.
+
 ## 0.10.0
 
 - Jauges et remplissage panneaux : plafonds relevés (mesurés sur la vraie installation de Carole). Jauge **Production** max 5000 → **6000 W** (elle saturait : pic du jour ~5200 W), jauge **Consommation** max 6000 → **9000 W**, remplissage **par panneau** `PANEL_MAX_W` 400 → **600 W** (strings SolarMan ~430 W / IzyPower ~460 W au pic). Segments des jauges ré-échelonnés en conséquence.

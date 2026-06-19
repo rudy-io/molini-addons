@@ -59,6 +59,7 @@ async def test_rebuild_dashboard_smoke(tmp_path, monkeypatch):
             {"entity_id": "sensor.molini_power_w", "state": "1234"},
             {"entity_id": "sensor.molini_tempo_today", "state": "BLEU"},
         ]
+        fake_ha.sensor_max_over = AsyncMock(return_value={})
         fake_ha.close = AsyncMock()
         ha_class.return_value = fake_ha
 
@@ -97,6 +98,7 @@ async def test_rebuild_dashboard_rejects_invalid_block(tmp_path, monkeypatch):
     with patch("molini_agent.commands.HAClient") as ha_class:
         fake_ha = AsyncMock()
         fake_ha.states.return_value = []
+        fake_ha.sensor_max_over = AsyncMock(return_value={})
         fake_ha.close = AsyncMock()
         ha_class.return_value = fake_ha
 
@@ -139,6 +141,7 @@ async def test_rebuild_dashboard_empty_payload_uses_defaults(tmp_path, monkeypat
     with patch("molini_agent.commands.HAClient") as ha_class:
         fake_ha = AsyncMock()
         fake_ha.states.return_value = []
+        fake_ha.sensor_max_over = AsyncMock(return_value={})
         fake_ha.close = AsyncMock()
         ha_class.return_value = fake_ha
 

@@ -25,6 +25,7 @@ from molini_agent.dashboard_builder import (
     build_yaml,
     check_missing_entities,
     extract_entities_from_block,
+    prod_gauge_scale,
     validate_blocks,
     write_yaml_atomic,
 )
@@ -393,3 +394,43 @@ def test_dynamic_cards_replace_marker(tmp_path):
     cards = doc["views"][0]["cards"]
     assert {"type": "markdown", "content": "MOLINI_PANELS"} not in cards
     assert {"type": "heading", "heading": "Onduleur 1"} in cards
+
+
+# ─── Substitution order fix (A) ───────────────────────────────────────────────
+
+def test_build_yaml_substitution_order(tmp_path):
+    """Le token le plus long doit être substitué en premier pour éviter qu'un
+    préfixe plus court ne corrompe la valeur du token plus long.
+    Ex : __A__ est préfixe de __A_B__ → sans tri, __A_B__ → 'X_B__'."""
+    blocks_dir = tmp_path / "blocks"
+    blocks_dir.mkdir()
+    (blocks_dir / "_header.yaml").write_text(
+        'title: T\npath: t\ncards:\n  - type: markdown\n    content: "__A__ and __A_B__"\n',
+        encoding="utf-8",
+    )
+    result = build_yaml(
+        ["_header"],
+        blocks_dir=blocks_dir,
+        substitutions={"__A__": "X", "__A_B__": "Y"},
+    )
+    assert "X and Y" in result.yaml_text
+    # La version buggée aurait produit "X and X_B__"
+    assert "X_B__" not in result.yaml_text
+
+
+# ─── prod_gauge_scale (B3) ────────────────────────────────────────────────────
+
+def test_prod_gauge_scale_observed_peak():
+    """5200 W × 1.1 = 5720 → ceil au 500 supérieur = 6000."""
+    gmax, seg1, seg2 = prod_gauge_scale(5200)
+    assert gmax == 6000
+    assert seg1 == int(round(6000 * 0.33))
+    assert seg2 == int(round(6000 * 0.67))
+
+
+def test_prod_gauge_scale_floor():
+    """Quand observed_max_w=0, le plancher PROD_FLOOR_W=3000 s'applique."""
+    gmax, seg1, seg2 = prod_gauge_scale(0)
+    assert gmax == 3000
+    assert seg1 == int(round(3000 * 0.33))
+    assert seg2 == int(round(3000 * 0.67))

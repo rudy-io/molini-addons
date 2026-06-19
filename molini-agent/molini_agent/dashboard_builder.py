@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import io
 import logging
+import math
 import os
 import re
 from dataclasses import dataclass
@@ -33,6 +34,18 @@ from typing import Any, Iterable
 from ruamel.yaml import YAML
 
 log = logging.getLogger("molini_agent.dashboard_builder")
+
+# ─── Constantes auto-calibrage production ─────────────────────────────────────
+PROD_FLOOR_W = 3000    # plancher de la jauge production (W)
+PROD_HEADROOM = 1.1    # marge au-dessus du pic observé
+
+
+def prod_gauge_scale(observed_max_w: float) -> tuple[int, int, int]:
+    """Retourne (max, seg_ambre, seg_vert) pour la jauge production, calé sur
+    le pic observé avec marge + plancher, arrondi au 500 supérieur."""
+    gmax = max(observed_max_w * PROD_HEADROOM, PROD_FLOOR_W)
+    gmax = int(math.ceil(gmax / 500.0) * 500)
+    return gmax, int(round(gmax * 0.33)), int(round(gmax * 0.67))
 
 
 # ─── White-list des blocs ─────────────────────────────────────────────────────
@@ -313,8 +326,8 @@ def build_yaml(
     yaml.dump(doc, buf)
     text = buf.getvalue()
     if substitutions:
-        for _token, _value in substitutions.items():
-            text = text.replace(_token, _value)
+        for _token in sorted(substitutions, key=len, reverse=True):
+            text = text.replace(_token, substitutions[_token])
 
     return BuildResult(
         yaml_text=text,
