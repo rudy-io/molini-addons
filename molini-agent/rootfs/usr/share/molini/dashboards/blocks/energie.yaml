@@ -85,6 +85,30 @@ sections:
             name: Production
             type: area
             color: "#1d9e75"
+          - entity: sensor.molini_consommation_maison
+            name: Consommation
+            type: line
+            color: "#e24b4a"
+
+  - type: grid
+    cards:
+      - type: heading
+        heading: Répartition en direct
+        heading_style: title
+
+      - type: entities
+        state_color: false
+        entities:
+          - entity: sensor.molini_solaire_production
+            name: Production solaire
+          - entity: sensor.molini_consommation_maison
+            name: Consommation maison
+          - entity: sensor.molini_autoconsommation
+            name: Autoconsommée
+          - entity: sensor.molini_reseau_soutire
+            name: Soutiré au réseau
+          - entity: sensor.molini_reseau_injecte
+            name: Injecté au réseau (surplus)
 
   - type: grid
     cards:

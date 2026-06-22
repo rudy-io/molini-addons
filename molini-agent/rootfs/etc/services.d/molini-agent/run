@@ -80,6 +80,20 @@ if [ -d "${BLOCKS_SRC}" ]; then
   fi
 fi
 
+# ─── Déploiement des packages Moli (modèle énergie, etc.) ─────────────────────
+# Packages HA embarqués dans l'image, copiés vers /config/packages → chargés via
+# homeassistant: packages: !include_dir_named packages. Écrasés à chaque démarrage.
+PKG_SRC="/usr/share/molini/packages"
+PKG_DST="/config/packages"
+if [ -d "${PKG_SRC}" ]; then
+  mkdir -p "${PKG_DST}"
+  if cp -f "${PKG_SRC}"/*.yaml "${PKG_DST}"/ 2>/dev/null; then
+    bashio::log.info "Packages Moli déployés → ${PKG_DST}"
+  else
+    bashio::log.warning "Aucun package à déployer depuis ${PKG_SRC}"
+  fi
+fi
+
 # ─── Déploiement des cartes Lovelace custom (button-card, apexcharts, kiosk-mode) ─────────
 # Embarquées dans l'image, copiées vers /config/www/moli-cards → servies sur
 # /local/moli-cards/ et chargées via frontend:extra_module_url (cf. provision).

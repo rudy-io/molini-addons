@@ -27,17 +27,10 @@ log = logging.getLogger("molini_agent.ha_discovery")
 
 # ─── Patterns par rôle MOLINI ────────────────────────────────────
 PATTERNS: dict[str, list[str]] = {
-    # Consommation réelle de la maison — nécessite une vraie mesure : Linky en
-    # TIC *standard* (SINSTS = puissance soutirée), ou un compteur dédié type
-    # Shelly EM. NB : izypower "consommation" est VOLONTAIREMENT exclu — il vaut
-    # = prod PV (autoconso supposée 100 %), ce n'est pas une vraie conso maison.
-    "conso_power": [
-        r"^sensor\.(?:linky|zlinky|sonde_linky)[\w_]*sinsts$",
-        r"^sensor\.[\w_]*puissance_soutiree[\w_]*$",
-        r"^sensor\.[\w_]*shelly[\w_]*_power$",
-    ],
-    # Puissance soutirée réseau (Linky) — papp (TIC historique) ou sinsts (standard)
+    # Puissance soutirée réseau (Linky) — puissance active (W) en priorité,
+    # puis sinsts (TIC standard), puis papp/puissance_apparente (TIC historique).
     "linky_power": [
+        r"^sensor\.(?:lixee_)?zlinky[\w_]*_puissance$",
         r"^sensor\.(?:linky|sonde_linky|zlinky)[\w_]*sinsts$",
         r"^sensor\.(?:linky|sonde_linky|zlinky)[\w_]*(?:papp|puissance_apparente)$",
     ],
@@ -165,8 +158,7 @@ def _states(eid: str) -> str:
 
 def generate_yaml(detected: dict[str, Union[str, list[str]]]) -> str:
     role_specs: dict[str, tuple[str, str, Optional[str], Optional[str], Optional[str]]] = {
-        "conso_power": ("MOLINI Consommation maison", "molini_conso_power_w", "W", "power", "measurement"),
-        "linky_power": ("MOLINI Puissance soutirée", "molini_power_w", "W", "power", "measurement"),
+        "linky_power": ("MOLINI Puissance soutirée", "molini_puissance_soutiree", "W", "power", "measurement"),
         "linky_hc": ("MOLINI Index HC", "molini_index_hc", "kWh", "energy", "total_increasing"),
         "linky_hp": ("MOLINI Index HP", "molini_index_hp", "kWh", "energy", "total_increasing"),
         "tempo_today": ("MOLINI Tempo aujourd'hui", "molini_tempo_today", None, None, None),

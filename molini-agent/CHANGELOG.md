@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.0
+
+- Modèle **consommation / autoconsommation** : nouveaux capteurs `molini_consommation_maison` (= production + puissance réseau), `molini_reseau_soutire`, `molini_reseau_injecte`, `molini_autoconsommation` (package `molini_energy.yaml` auto-déployé dans `/config/packages`). Conçu pour rester juste que la puissance réseau soit « soutiré seul » ou « nette signée ».
+- `ha_discovery` détecte la puissance réseau active du Linky (`*zlinky*_puissance`) → `molini_puissance_soutiree` ; rôle `conso_power` (qui mappait à tort le soutiré comme « conso ») retiré au profit du capteur dérivé.
+- Dashboard : jauge consommation (enfin alimentée), consommation ajoutée à la courbe 24 h, et section « Répartition en direct » (production / conso / autoconsommée / soutiré / injecté).
+
 ## 0.12.0
 
 - Mode « appliance Moli » : pour les utilisateurs **non-admin** (kiosk-mode chargé via `extra_module_url`), la **sidebar HA est masquée** — ils ne voient que le dashboard Moli. Les admins gardent l'interface complète.
