@@ -1,18 +1,11 @@
-# MOLINI — modèle énergie (conso / autoconso / échange réseau).
-# Auto-déployé par l'add-on dans /config/packages. Référence les capteurs
-# molini_* générés par ha_discovery.
+# MOLINI — réseau (côté EDF). Auto-déployé par l'add-on dans /config/packages.
 #
-# Topologie : le Linky mesure l'échange réseau (pas la prod ni la conso).
-#   - soutiré (molini_puissance_soutiree = SINSTS) = ce qu'on TIRE du réseau (>0 si conso>prod)
-#   - injecté = le SURPLUS renvoyé au réseau quand on produit plus qu'on consomme.
-#     Le compteur de Carole ne sort PAS le SINSTI standard, mais l'injection
-#     apparaît dans la puissance réseau TOTALE (molini_puissance_totale =
-#     ElectricalMeasurement total_active_power = magnitude du flux net). Donc :
-#       quand soutiré ~0 (on n'est pas en soutirage) => injecté = puissance_totale.
-#       quand on soutire (soutiré > seuil) => injecté = 0 (pas de faux positif).
-#   - Conso maison = production + soutiré − injecté.
-#   - Autoconsommation = production − injecté.
-# Dégrade proprement si molini_puissance_totale absent (injecté = 0 -> conso = prod + soutiré).
+# IMPORTANT : le Linky ne mesure QUE l'échange réseau — le **soutiré** (ce qu'on
+# TIRE du réseau = ce qui est payant EDF). Le solaire **autoconsommé** lui est
+# invisible (il passe direct des panneaux à la maison sans traverser le compteur).
+# Donc on n'expose ici que le réseau, qui est fiable et utile (la facture).
+# La **consommation totale** et l'**autoconsommation** nécessitent une pince de
+# mesure dédiée (ex. Meross EM06) sur l'arrivée générale — à venir.
 template:
   - sensor:
       - name: "MOLINI Réseau soutiré"
@@ -23,39 +16,9 @@ template:
         availability: "{{ states('sensor.molini_puissance_soutiree') not in ['unknown','unavailable','none'] }}"
         state: "{{ [ states('sensor.molini_puissance_soutiree') | float(0), 0 ] | max | round(0) }}"
 
-      - name: "MOLINI Réseau injecté"
-        unique_id: molini_reseau_injecte
-        unit_of_measurement: "W"
-        device_class: power
-        state_class: measurement
-        availability: "{{ states('sensor.molini_puissance_soutiree') not in ['unknown','unavailable','none'] }}"
-        state: >
-          {% set s = states('sensor.molini_puissance_soutiree') | float(0) %}
-          {% set t = states('sensor.molini_puissance_totale') | float(0) %}
-          {{ ([t, 0] | max if s < 50 else 0) | round(0) }}
-
-      - name: "MOLINI Consommation maison"
-        unique_id: molini_consommation_maison
-        unit_of_measurement: "W"
-        device_class: power
-        state_class: measurement
-        availability: "{{ states('sensor.molini_puissance_soutiree') not in ['unknown','unavailable','none'] }}"
-        state: >
-          {% set p = states('sensor.molini_solaire_production') | float(0) %}
-          {% set s = states('sensor.molini_puissance_soutiree') | float(0) %}
-          {% set t = states('sensor.molini_puissance_totale') | float(0) %}
-          {% set inj = ([t, 0] | max if s < 50 else 0) %}
-          {{ [ p + s - inj, 0 ] | max | round(0) }}
-
-      - name: "MOLINI Autoconsommation"
-        unique_id: molini_autoconsommation
-        unit_of_measurement: "W"
-        device_class: power
-        state_class: measurement
-        availability: "{{ states('sensor.molini_solaire_production') not in ['unknown','unavailable','none'] }}"
-        state: >
-          {% set p = states('sensor.molini_solaire_production') | float(0) %}
-          {% set s = states('sensor.molini_puissance_soutiree') | float(0) %}
-          {% set t = states('sensor.molini_puissance_totale') | float(0) %}
-          {% set inj = ([t, 0] | max if s < 50 else 0) %}
-          {{ [ p - inj, 0 ] | max | round(0) }}
+# Énergie tirée du réseau aujourd'hui (= payant EDF), remise à zéro chaque jour.
+# Source = molini_soutire_total (EAST cumulatif détecté par ha_discovery).
+utility_meter:
+  molini_soutire_jour:
+    source: sensor.molini_soutire_total
+    cycle: daily

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.15.0
+
+- **Dashboard honnête (le Linky ne mesure que le réseau, pas la conso totale)** : le compteur de Carole n'expose pas l'injection, et le solaire autoconsommé lui est invisible → impossible de calculer la conso totale / l'autoconso sans une pince de mesure dédiée. On arrête donc d'afficher une fausse conso. Le dashboard montre désormais ce qui est **fiable et utile** : production solaire + **« Réseau (EDF) »** (le soutiré = ce qu'elle achète à EDF) + **« Tiré du réseau aujourd'hui »** en kWh et en € (compteur journalier `utility_meter` sur l'EAST). Mention « conso totale & autoconso : à l'installation de la pince ».
+- Retrait des capteurs faux (`molini_consommation_maison`/`_autoconsommation`/`_reseau_injecte` basés sur la « puissance totale » qui s'est avérée être un artefact figé en 0.14.0). Nouveau rôle `linky_soutire_total` → `molini_soutire_total` (EAST), `linky_net_power` retiré.
+
 ## 0.14.0
 
 - **Fix conso = prod en journée** : le compteur de Carole ne sort pas le SINSTI standard, donc en injection (surplus le jour) le soutiré=0 et `molini_consommation_maison` retombait sur la production (prod et conso superposées). L'injection est en fait dans la **puissance réseau totale** (ElectricalMeasurement `total_active_power` = magnitude du flux net). Nouveau rôle `linky_net_power` → `molini_puissance_totale`, et modèle corrigé : `injecté = puissance_totale quand soutiré ~0` (sinon 0, pas de faux positif en soutirage) ; **conso = prod + soutiré − injecté** ; autoconso = prod − injecté. Dégrade proprement (injecté=0) si la puissance totale n'est pas détectée.
