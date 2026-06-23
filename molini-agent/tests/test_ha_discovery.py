@@ -67,6 +67,25 @@ async def test_discover_entities_maps_zlinky_to_linky_power():
 
 
 @pytest.mark.asyncio
+async def test_discover_entities_maps_zlinky_totale_to_net_power():
+    """puissance_totale -> linky_net_power (sert à déduire l'injection)."""
+    from molini_agent.ha_client import HAClient
+
+    fake_states = _live_states(
+        "sensor.lixee_zlinky_tic_puissance",
+        "sensor.lixee_zlinky_tic_puissance_totale",
+    )
+
+    ha = HAClient("http://supervisor/core", "fake_token")
+    with patch.object(ha, "states", new=AsyncMock(return_value=fake_states)):
+        detected = await discover_entities(ha)
+
+    assert detected.get("linky_power") == "sensor.lixee_zlinky_tic_puissance"
+    assert detected.get("linky_net_power") == "sensor.lixee_zlinky_tic_puissance_totale"
+    assert "molini_puissance_totale" in generate_yaml(detected)
+
+
+@pytest.mark.asyncio
 async def test_discover_entities_no_conso_power():
     """discover_entities ne doit jamais émettre un rôle conso_power."""
     from molini_agent.ha_client import HAClient

@@ -34,6 +34,13 @@ PATTERNS: dict[str, list[str]] = {
         r"^sensor\.(?:linky|sonde_linky|zlinky)[\w_]*sinsts$",
         r"^sensor\.(?:linky|sonde_linky|zlinky)[\w_]*(?:papp|puissance_apparente)$",
     ],
+    # Puissance réseau TOTALE (magnitude du flux net) — sert à déduire
+    # l'injection : quand le soutiré (SINSTS) est ~0, c'est qu'on injecte, et
+    # injecté = puissance_totale. (ZLinky standard : ElectricalMeasurement
+    # total_active_power ; le compteur de Carole ne sort PAS le SINSTI standard.)
+    "linky_net_power": [
+        r"^sensor\.(?:lixee_)?zlinky[\w_]*_puissance_totale$",
+    ],
     "linky_hc": [
         r"^sensor\.(?:linky|sonde_linky|zlinky)[\w_]*(?:hchc|index_hchc)$",
         r"^sensor\.(?:lixee_)?zlinky[\w_]*consommation_partie_1$",
@@ -159,6 +166,7 @@ def _states(eid: str) -> str:
 def generate_yaml(detected: dict[str, Union[str, list[str]]]) -> str:
     role_specs: dict[str, tuple[str, str, Optional[str], Optional[str], Optional[str]]] = {
         "linky_power": ("MOLINI Puissance soutirée", "molini_puissance_soutiree", "W", "power", "measurement"),
+        "linky_net_power": ("MOLINI Puissance totale", "molini_puissance_totale", "W", "power", "measurement"),
         "linky_hc": ("MOLINI Index HC", "molini_index_hc", "kWh", "energy", "total_increasing"),
         "linky_hp": ("MOLINI Index HP", "molini_index_hp", "kWh", "energy", "total_increasing"),
         "tempo_today": ("MOLINI Tempo aujourd'hui", "molini_tempo_today", None, None, None),

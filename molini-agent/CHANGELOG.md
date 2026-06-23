@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.14.0
+
+- **Fix conso = prod en journée** : le compteur de Carole ne sort pas le SINSTI standard, donc en injection (surplus le jour) le soutiré=0 et `molini_consommation_maison` retombait sur la production (prod et conso superposées). L'injection est en fait dans la **puissance réseau totale** (ElectricalMeasurement `total_active_power` = magnitude du flux net). Nouveau rôle `linky_net_power` → `molini_puissance_totale`, et modèle corrigé : `injecté = puissance_totale quand soutiré ~0` (sinon 0, pas de faux positif en soutirage) ; **conso = prod + soutiré − injecté** ; autoconso = prod − injecté. Dégrade proprement (injecté=0) si la puissance totale n'est pas détectée.
+
 ## 0.13.0
 
 - Modèle **consommation / autoconsommation** : nouveaux capteurs `molini_consommation_maison` (= production + puissance réseau), `molini_reseau_soutire`, `molini_reseau_injecte`, `molini_autoconsommation` (package `molini_energy.yaml` auto-déployé dans `/config/packages`). Conçu pour rester juste que la puissance réseau soit « soutiré seul » ou « nette signée ».

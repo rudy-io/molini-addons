@@ -1,9 +1,39 @@
 # MOLINI — modèle énergie (conso / autoconso / échange réseau).
 # Auto-déployé par l'add-on dans /config/packages. Référence les capteurs
-# molini_* générés par ha_discovery (molini_solaire_production + molini_puissance_soutiree).
-# Conso maison = production + puissance réseau (soutiré +, injecté -).
+# molini_* générés par ha_discovery.
+#
+# Topologie : le Linky mesure l'échange réseau (pas la prod ni la conso).
+#   - soutiré (molini_puissance_soutiree = SINSTS) = ce qu'on TIRE du réseau (>0 si conso>prod)
+#   - injecté = le SURPLUS renvoyé au réseau quand on produit plus qu'on consomme.
+#     Le compteur de Carole ne sort PAS le SINSTI standard, mais l'injection
+#     apparaît dans la puissance réseau TOTALE (molini_puissance_totale =
+#     ElectricalMeasurement total_active_power = magnitude du flux net). Donc :
+#       quand soutiré ~0 (on n'est pas en soutirage) => injecté = puissance_totale.
+#       quand on soutire (soutiré > seuil) => injecté = 0 (pas de faux positif).
+#   - Conso maison = production + soutiré − injecté.
+#   - Autoconsommation = production − injecté.
+# Dégrade proprement si molini_puissance_totale absent (injecté = 0 -> conso = prod + soutiré).
 template:
   - sensor:
+      - name: "MOLINI Réseau soutiré"
+        unique_id: molini_reseau_soutire
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        availability: "{{ states('sensor.molini_puissance_soutiree') not in ['unknown','unavailable','none'] }}"
+        state: "{{ [ states('sensor.molini_puissance_soutiree') | float(0), 0 ] | max | round(0) }}"
+
+      - name: "MOLINI Réseau injecté"
+        unique_id: molini_reseau_injecte
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        availability: "{{ states('sensor.molini_puissance_soutiree') not in ['unknown','unavailable','none'] }}"
+        state: >
+          {% set s = states('sensor.molini_puissance_soutiree') | float(0) %}
+          {% set t = states('sensor.molini_puissance_totale') | float(0) %}
+          {{ ([t, 0] | max if s < 50 else 0) | round(0) }}
+
       - name: "MOLINI Consommation maison"
         unique_id: molini_consommation_maison
         unit_of_measurement: "W"
@@ -12,22 +42,11 @@ template:
         availability: "{{ states('sensor.molini_puissance_soutiree') not in ['unknown','unavailable','none'] }}"
         state: >
           {% set p = states('sensor.molini_solaire_production') | float(0) %}
-          {% set g = states('sensor.molini_puissance_soutiree') | float(0) %}
-          {{ [p + g, 0] | max | round(0) }}
-      - name: "MOLINI Réseau soutiré"
-        unique_id: molini_reseau_soutire
-        unit_of_measurement: "W"
-        device_class: power
-        state_class: measurement
-        availability: "{{ states('sensor.molini_puissance_soutiree') not in ['unknown','unavailable','none'] }}"
-        state: "{{ [ states('sensor.molini_puissance_soutiree') | float(0), 0 ] | max | round(0) }}"
-      - name: "MOLINI Réseau injecté"
-        unique_id: molini_reseau_injecte
-        unit_of_measurement: "W"
-        device_class: power
-        state_class: measurement
-        availability: "{{ states('sensor.molini_puissance_soutiree') not in ['unknown','unavailable','none'] }}"
-        state: "{{ [ -1 * (states('sensor.molini_puissance_soutiree') | float(0)), 0 ] | max | round(0) }}"
+          {% set s = states('sensor.molini_puissance_soutiree') | float(0) %}
+          {% set t = states('sensor.molini_puissance_totale') | float(0) %}
+          {% set inj = ([t, 0] | max if s < 50 else 0) %}
+          {{ [ p + s - inj, 0 ] | max | round(0) }}
+
       - name: "MOLINI Autoconsommation"
         unique_id: molini_autoconsommation
         unit_of_measurement: "W"
@@ -36,5 +55,7 @@ template:
         availability: "{{ states('sensor.molini_solaire_production') not in ['unknown','unavailable','none'] }}"
         state: >
           {% set p = states('sensor.molini_solaire_production') | float(0) %}
-          {% set inj = [ -1 * (states('sensor.molini_puissance_soutiree') | float(0)), 0 ] | max %}
+          {% set s = states('sensor.molini_puissance_soutiree') | float(0) %}
+          {% set t = states('sensor.molini_puissance_totale') | float(0) %}
+          {% set inj = ([t, 0] | max if s < 50 else 0) %}
           {{ [ p - inj, 0 ] | max | round(0) }}
