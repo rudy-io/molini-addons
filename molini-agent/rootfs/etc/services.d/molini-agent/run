@@ -109,6 +109,22 @@ if [ -d "${CARDS_SRC}" ]; then
   fi
 fi
 
+# ─── Déploiement du composant de conversation Moli AI (Assist → cerveau central) ─────────
+# Custom component embarqué, copié vers /config/custom_components/moli_ai + sa config
+# (central_url + token). Un marqueur `moli_ai:` dans configuration.yaml déclenche
+# l'auto-config (import flow) au prochain démarrage HA → l'occupant chatte avec Moli AI.
+MOLI_AI_SRC="/usr/share/molini/custom_components/moli_ai"
+MOLI_AI_DST="/config/custom_components/moli_ai"
+if [ -d "${MOLI_AI_SRC}" ]; then
+  mkdir -p "/config/custom_components"
+  cp -rf "${MOLI_AI_SRC}" "/config/custom_components/"
+  printf '{"central_url": "%s", "token": "%s"}\n' "${CENTRAL_URL}" "${CLIENT_TOKEN}" > "${MOLI_AI_DST}/moli_config.json"
+  if ! grep -qE '^moli_ai:' /config/configuration.yaml 2>/dev/null; then
+    printf '\nmoli_ai:\n' >> /config/configuration.yaml
+  fi
+  bashio::log.info "Composant conversation Moli AI déployé → ${MOLI_AI_DST}"
+fi
+
 bashio::log.info "Moli Agent ${AGENT_VERSION} starting — central=${CENTRAL_URL} interval=${HEARTBEAT_INTERVAL_S}s runtime=${MOLINI_RUNTIME}"
 
 cd /app

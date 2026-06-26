@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.16.0
+
+- **Conversation Moli AI dans Assist** : l'add-on déploie un composant HA (`custom_components/moli_ai`) qui branche l'agent de conversation de Home Assistant sur le cerveau central Moli AI (`/api/agent/converse`). L'occupant peut désormais **discuter avec Moli en français** depuis Assist (état de la maison, énergie…). Auto-configuré au démarrage (central_url + token déposés par l'add-on ; marqueur `moli_ai:` dans `configuration.yaml`). Après MAJ : **redémarrer HA**, puis Réglages → Assist : choisir « Moli AI » comme agent de conversation + exposer les entités.
+
 ## 0.15.0
 
 - **Dashboard honnête (le Linky ne mesure que le réseau, pas la conso totale)** : le compteur de Carole n'expose pas l'injection, et le solaire autoconsommé lui est invisible → impossible de calculer la conso totale / l'autoconso sans une pince de mesure dédiée. On arrête donc d'afficher une fausse conso. Le dashboard montre désormais ce qui est **fiable et utile** : production solaire + **« Réseau (EDF) »** (le soutiré = ce qu'elle achète à EDF) + **« Tiré du réseau aujourd'hui »** en kWh et en € (compteur journalier `utility_meter` sur l'EAST). Mention « conso totale & autoconso : à l'installation de la pince ».
