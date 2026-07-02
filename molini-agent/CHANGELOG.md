@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.17.0
+
+**Onboarding v0.8 — pose automatique de la config HA Moli** (fini le « posé à
+la main chez Carole ») :
+
+- Nouveau module `moli_config.py` : pose `homeassistant: packages:
+  !include_dir_named packages` + `lovelace: dashboards: moli-energie:` (clé
+  avec tiret, mode yaml, `dashboards/molini.yaml`) dans `configuration.yaml`.
+  - **Contenu FIGÉ dans le code** (aucun payload du central) — c'est le
+    « mécanisme dédié hors white-list patch » : `homeassistant`/`lovelace`
+    restent interdits à `patch_ha_config`.
+  - **Conservateur** : n'écrit que ce qui MANQUE, ne modifie jamais une valeur
+    existante (un `packages:` custom ou un dashboard `moli-energie` perso sont
+    laissés intacts). Idempotent, backup `.bak-YYYYMMDD`, écriture atomique.
+  - Erreur de parse YAML → on ne touche PAS au fichier.
+- **Appelé au boot de l'agent** (HAOS) : une box neuve a sa config posée dès le
+  premier démarrage de l'add-on. Le restart HA qui la charge reste piloté par
+  le central (jamais auto au boot → pas de boucle de restart).
+- **Appelé par `bootstrap_stack`** (rapport `moli_config` +
+  `ha_restart_pending` fusionné) et disponible en commande dédiée
+  `ensure_moli_config`.
+- Heartbeat : `bootstrap_state.moli_config_ok` (true/false/null) — le wizard
+  central sait si la config est posée.
+- Tests : +11 (`test_moli_config.py`), suite verte 180/180.
+
 ## 0.16.1
 
 **Garde-fou ZHA** (audit 2026-07-02) — ne JAMAIS poser Zigbee2MQTT sur une box

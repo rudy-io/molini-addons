@@ -284,7 +284,15 @@ async def test_bootstrap_stack_idempotent(mock_supervisor, mock_yaml_patch):
         "      primary-text-color: '#e8eef2'\n"
         "      secondary-text-color: '#9fb2c0'\n"
         "      state-icon-color: '#1d9e75'\n"
-        "      paper-item-icon-color: '#9fb2c0'\n",
+        "      paper-item-icon-color: '#9fb2c0'\n"
+        # Blocs Moli (v0.8 / 0.17.0) — une box idempotente les a déjà
+        "homeassistant:\n"
+        "  packages: !include_dir_named packages\n"
+        "lovelace:\n"
+        "  dashboards:\n"
+        "    moli-energie:\n"
+        "      mode: yaml\n"
+        "      filename: dashboards/molini.yaml\n",
         encoding="utf-8",
     )
 

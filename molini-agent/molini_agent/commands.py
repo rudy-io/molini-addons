@@ -37,6 +37,7 @@ from .dashboard_builder import build_and_write, prod_gauge_scale
 from .ha_client import HAClient
 from .ha_discovery import execute_ha_provision
 from .yaml_patch import remove_top_keys_in_file
+from .moli_config import ensure_moli_ha_config
 from .zigbee import detect_zigbee_stack
 
 log = logging.getLogger("molini_agent.commands")
@@ -589,6 +590,10 @@ async def _reload_lovelace(cfg: Config) -> dict[str, Any]:
     return results
 
 
+async def _run_sync(fn):
+    return fn()
+
+
 # ─── Dispatcher ───────────────────────────────────────────────────────────────
 
 HANDLERS = {
@@ -605,6 +610,9 @@ HANDLERS = {
     "bootstrap_stack": lambda cfg, payload: execute_bootstrap_stack(cfg, payload),
     "install_addon": lambda cfg, payload: execute_install_addon(payload, cfg),
     "patch_ha_config": lambda cfg, payload: execute_patch_ha_config(payload),
+    # Pose des blocs config Moli (packages + dashboard lovelace) — contenu figé
+    # dans le code (pas de payload), idempotent, conservateur. Cf. moli_config.py.
+    "ensure_moli_config": lambda cfg, payload: _run_sync(ensure_moli_ha_config),
     "rebuild_dashboard": lambda cfg, payload: execute_rebuild_dashboard(cfg, payload),
 }
 

@@ -8,6 +8,7 @@ import httpx
 
 from .backup import backup_loop
 from .bootstrap import collect_bootstrap_state
+from .moli_config import ensure_moli_ha_config
 from .commands import poll_and_execute
 from .config import AGENT_VERSION, Config, configure_logging
 from .ha_client import HAClient
@@ -60,6 +61,19 @@ async def loop(cfg: Config) -> None:
             ha_version,
             cfg.heartbeat_interval_s,
         )
+
+        # Onboarding v0.8 : pose des blocs config Moli (packages + dashboard)
+        # dès le boot — conservateur (n'écrit que ce qui manque), donc sans
+        # risque sur une box déjà configurée. Le restart HA qui charge ces
+        # blocs est séquencé par le central (jamais auto au boot → pas de
+        # boucle de restart).
+        if is_haos():
+            try:
+                mc = ensure_moli_ha_config()
+                if mc.get("changed"):
+                    log.info("moli_config posé au boot — restart HA requis (piloté par le central)")
+            except Exception as e:
+                log.warning("ensure_moli_ha_config au boot: %s", e)
 
         backup_task = asyncio.create_task(backup_loop(cfg))
 

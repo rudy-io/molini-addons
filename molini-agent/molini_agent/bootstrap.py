@@ -47,6 +47,7 @@ from typing import Any, Optional
 from . import supervisor_client
 from .config import Config
 from .ha_client import HAClient
+from .moli_config import ensure_moli_ha_config, moli_config_present
 from .yaml_patch import YamlPatchError, apply_patch_to_file
 from .zigbee import detect_zigbee_stack, guard_payload, zigbee_stack_from_states
 
@@ -494,10 +495,20 @@ async def bootstrap_stack(
         if not config_patch_result.get("ok"):
             errors.append(f"ha_config:{config_patch_result.get('error')}")
 
+    # Pose des blocs Moli (homeassistant.packages + lovelace dashboard) —
+    # mécanisme dédié hors white-list patch : contenu FIGÉ dans le code,
+    # conservateur (n'écrit que ce qui manque). Cf. moli_config.py.
+    if skip_yaml:
+        moli_config_result: dict[str, Any] = {"ok": True, "skipped": True}
+    else:
+        moli_config_result = ensure_moli_ha_config()
+        if not moli_config_result.get("ok"):
+            errors.append(f"moli_config:{moli_config_result.get('error')}")
+
     # Compute restart pending: True only if HA config was actually changed.
     ha_restart_pending = bool(
         config_patch_result.get("changed") and config_patch_result.get("ok")
-    )
+    ) or bool(moli_config_result.get("ha_restart_pending"))
 
     statuses = [a["status"] for a in actions]
     summary = (
@@ -511,6 +522,7 @@ async def bootstrap_stack(
         "ok": not errors,
         "actions": actions,
         "ha_config_patch": config_patch_result,
+        "moli_config": moli_config_result,
         "ha_restart_pending": ha_restart_pending,
         "errors": errors,
         "summary": summary,
@@ -534,10 +546,17 @@ async def collect_bootstrap_state(ha: HAClient | None = None) -> dict[str, Any]:
         "zigbee2mqtt": "unknown",
         "cloudflared": "unknown",
         "zigbee_stack": "unknown",
+        "moli_config_ok": None,
         "trusted_proxies_ok": None,
         "purge_keep_days_ok": None,
         "ha_restart_pending": False,
     }
+
+    # Blocs config Moli (packages + dashboard lovelace) présents dans le
+    # fichier ? (None = illisible). Indépendant du superviseur → avant le
+    # early-return addons_list.
+    cfg_path = os.environ.get("HA_CONFIG_PATH") or "/config/configuration.yaml"
+    state["moli_config_ok"] = moli_config_present(cfg_path)
 
     try:
         addons = await supervisor_client.addons_list()
