@@ -46,7 +46,9 @@ from typing import Any, Optional
 
 from . import supervisor_client
 from .config import Config
+from .ha_client import HAClient
 from .yaml_patch import YamlPatchError, apply_patch_to_file
+from .zigbee import detect_zigbee_stack, guard_payload, zigbee_stack_from_states
 
 log = logging.getLogger("molini_agent.bootstrap")
 
@@ -427,7 +429,6 @@ async def bootstrap_stack(
           "summary": "X installed, Y started, Z skipped, W failed",
         }
     """
-    del cfg  # reserved for future use (auth, log enrichment)
     payload = payload or {}
 
     # Allow caller to limit which addons we touch (advanced UI use-case).
@@ -439,6 +440,28 @@ async def bootstrap_stack(
 
     actions: list[dict[str, Any]] = []
     errors: list[str] = []
+
+    # Garde-fou Zigbee : ne JAMAIS poser Z2M sur une box déjà en ZHA (conflit
+    # de coordinateur — cas Carole, ZBT-2). Détection best-effort ; ``unknown``
+    # = fail-open (une sonde qui rate ne doit pas bloquer une install saine).
+    # Override explicite : payload {"force_z2m": true} (migration assumée).
+    if "zigbee2mqtt" in requested and not payload.get("force_z2m"):
+        ha = (
+            HAClient(cfg.ha_url, cfg.ha_token)
+            if getattr(cfg, "ha_url", None) and getattr(cfg, "ha_token", None)
+            else None
+        )
+        try:
+            stack = await detect_zigbee_stack(ha)
+        finally:
+            if ha is not None:
+                await ha.close()
+        if stack in ("zha", "both"):
+            requested.remove("zigbee2mqtt")
+            actions.append(guard_payload(stack))
+            log.warning(
+                "bootstrap: zigbee2mqtt skipped — box en ZHA (stack=%s)", stack
+            )
 
     for name in requested:
         log.info("bootstrap: handling add-on %s", name)
@@ -496,16 +519,21 @@ async def bootstrap_stack(
 
 # ─── Heartbeat enrichment ────────────────────────────────────────────────────
 
-async def collect_bootstrap_state() -> dict[str, Any]:
+async def collect_bootstrap_state(ha: HAClient | None = None) -> dict[str, Any]:
     """Snapshot to embed in heartbeat under ``bootstrap_state``.
 
     Used by the central admin to render the install wizard checklist (chantier B)
     and decide whether to auto-enqueue ``bootstrap_stack``.
+
+    ``zigbee_stack`` (``zha``/``z2m``/``both``/``none``/``unknown``) permet au
+    central d'afficher le stack Zigbee de la box et au wizard de masquer
+    l'install Z2M sur les box en ZHA.
     """
     state: dict[str, Any] = {
         "mosquitto": "unknown",
         "zigbee2mqtt": "unknown",
         "cloudflared": "unknown",
+        "zigbee_stack": "unknown",
         "trusted_proxies_ok": None,
         "purge_keep_days_ok": None,
         "ha_restart_pending": False,
@@ -535,6 +563,18 @@ async def collect_bootstrap_state() -> dict[str, Any]:
     state["mosquitto"] = addon_state_for("mosquitto")
     state["zigbee2mqtt"] = addon_state_for("zigbee2mqtt")
     state["cloudflared"] = addon_state_for("cloudflared")
+
+    # Stack Zigbee (ZHA vs Z2M) — réutilise l'état add-on déjà calculé pour Z2M
+    # (pas de 2e appel superviseur) ; sonde ZHA via les config entries HA Core.
+    zha: Optional[bool] = None
+    if ha is not None:
+        try:
+            entries = await ha.config_entries()
+            if entries is not None:
+                zha = any(e.get("domain") == "zha" for e in entries)
+        except Exception as e:  # noqa: BLE001 — best-effort
+            log.warning("collect_bootstrap_state: zha probe failed: %s", e)
+    state["zigbee_stack"] = zigbee_stack_from_states(zha, state["zigbee2mqtt"])
 
     # HA config check — read configuration.yaml and look for our markers
     target = os.environ.get("HA_CONFIG_PATH") or "/config/configuration.yaml"

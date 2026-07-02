@@ -84,7 +84,7 @@ async def loop(cfg: Config) -> None:
             # without having to query each add-on individually.
             if is_haos():
                 try:
-                    payload["bootstrap_state"] = await collect_bootstrap_state()
+                    payload["bootstrap_state"] = await collect_bootstrap_state(ha)
                 except Exception as e:
                     log.warning("bootstrap_state collection failed: %s", e)
 

@@ -72,10 +72,15 @@ FORCED_LAST = "_reglages"
 
 # Defaults appliqués si la liste de blocs est vide ou si la colonne DB
 # n'a jamais été renseignée pour un client.
+# ⚠️ Ne lister ici QUE des blocs réellement livrés dans
+# rootfs/usr/share/molini/dashboards/blocks/ — un slug white-listé mais sans
+# fichier fait échouer tout le rebuild (gotcha prod 0.9.0 : « Block file not
+# found: chauffage » quand le central envoyait un payload sans `blocks`).
+# chauffage/ve/confort/securite/multimedia restent dans ALLOWED_BLOCKS pour le
+# futur, mais n'entrent ici qu'une fois leur fichier embarqué.
 DEFAULT_BLOCKS: tuple[str, ...] = (
     "_header",
     "energie",
-    "chauffage",
     "aide",
     "_reglages",
 )

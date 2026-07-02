@@ -34,6 +34,12 @@ from . import conftest
 
 BLOCKS_DIR = conftest.BLOCKS_DIR
 
+# Blocs réellement livrés sur les box (fichiers présents dans blocks/).
+# ALLOWED_BLOCKS contient aussi des blocs futurs (chauffage, ve, confort…)
+# sans fichier embarqué — les tests qui touchent le disque itèrent sur les
+# blocs LIVRÉS.
+SHIPPED_BLOCKS = [s for s in ALLOWED_BLOCKS if (BLOCKS_DIR / f"{s}.yaml").is_file()]
+
 
 # ─── validate_blocks ──────────────────────────────────────────────────────────
 
@@ -104,9 +110,9 @@ def test_validate_blocks_rejects_non_string():
 
 
 def test_build_yaml_returns_valid_yaml():
-    result = build_yaml(["energie", "chauffage"], blocks_dir=BLOCKS_DIR)
+    result = build_yaml(["energie", "aide"], blocks_dir=BLOCKS_DIR)
     assert isinstance(result, BuildResult)
-    assert result.blocks_used == ["energie", "chauffage"]
+    assert result.blocks_used == ["energie", "aide"]
 
     # Le YAML doit être parsable
     yaml = YAML(typ="rt")
@@ -118,11 +124,11 @@ def test_build_yaml_returns_valid_yaml():
 
 def test_build_yaml_full_set():
     """Avec tous les blocs activés, l'ordre est forcé et le YAML est valide."""
-    all_blocks = list(ALLOWED_BLOCKS)
+    all_blocks = list(SHIPPED_BLOCKS)
     result = build_yaml(all_blocks, blocks_dir=BLOCKS_DIR)
     assert result.blocks_used[0] == "_header"
     assert result.blocks_used[-1] == "_reglages"
-    assert len(result.blocks_used) == len(ALLOWED_BLOCKS)
+    assert len(result.blocks_used) == len(SHIPPED_BLOCKS)
 
 
 def test_build_yaml_defaults_when_empty():
@@ -133,8 +139,8 @@ def test_build_yaml_defaults_when_empty():
 
 def test_build_yaml_idempotence(tmp_path):
     """2 builds successifs produisent un YAML identique au byte près."""
-    result1 = build_yaml(["energie", "chauffage", "aide"], blocks_dir=BLOCKS_DIR)
-    result2 = build_yaml(["energie", "chauffage", "aide"], blocks_dir=BLOCKS_DIR)
+    result1 = build_yaml(["energie", "aide"], blocks_dir=BLOCKS_DIR)
+    result2 = build_yaml(["energie", "aide"], blocks_dir=BLOCKS_DIR)
     assert result1.yaml_text == result2.yaml_text
 
 
@@ -247,16 +253,16 @@ def test_build_yaml_reports_missing_entities_per_block():
     """Le BuildResult expose un map block → entités manquantes."""
     available = {"sensor.molini_power_w"}  # Très réduit, beaucoup manquera
     result = build_yaml(
-        ["energie", "chauffage"],
+        ["energie"],
         blocks_dir=BLOCKS_DIR,
         available_entity_ids=available,
     )
-    # Le bloc chauffage référence climate.molini_thermostat_main qui n'est pas
+    # Le bloc energie référence les capteurs molini_* qui ne sont pas
     # dans `available`
-    assert "chauffage" in result.missing_entities
+    assert "energie" in result.missing_entities
     assert any(
-        e.startswith("climate.")
-        for e in result.missing_entities["chauffage"]
+        e.startswith("sensor.molini_")
+        for e in result.missing_entities["energie"]
     )
 
 
@@ -356,20 +362,24 @@ def test_build_and_write_invalid_block_no_write(tmp_path):
 def test_all_partial_blocks_parse():
     """Chaque fichier de bloc dans blocks/ doit être un YAML mapping valide."""
     yaml = YAML(typ="rt")
-    for slug in ALLOWED_BLOCKS:
+    assert SHIPPED_BLOCKS, "aucun bloc livré trouvé — BLOCKS_DIR faux ?"
+    for slug in SHIPPED_BLOCKS:
         path = BLOCKS_DIR / f"{slug}.yaml"
         assert path.is_file(), f"Missing block file: {path}"
         with open(path, "r", encoding="utf-8") as f:
             data = yaml.load(f)
         assert isinstance(data, dict), f"Block {slug} not a mapping"
-        # Chaque bloc doit avoir un titre + un path + une liste cards
+        # Chaque bloc doit avoir un titre + des cards (layout classique)
+        # ou des sections (layout HA "sections" — energie depuis 0.13)
         assert "title" in data, f"Block {slug} missing title"
-        assert "cards" in data, f"Block {slug} missing cards"
+        assert (
+            "cards" in data or "sections" in data
+        ), f"Block {slug} missing cards/sections"
 
 
 def test_assembled_yaml_is_valid_lovelace():
     """L'output assemblé doit avoir la structure attendue par Lovelace."""
-    result = build_yaml(list(ALLOWED_BLOCKS), blocks_dir=BLOCKS_DIR)
+    result = build_yaml(list(SHIPPED_BLOCKS), blocks_dir=BLOCKS_DIR)
     yaml = YAML(typ="rt")
     data = yaml.load(result.yaml_text)
     assert "title" in data
@@ -377,7 +387,7 @@ def test_assembled_yaml_is_valid_lovelace():
     assert isinstance(data["views"], list)
     for view in data["views"]:
         assert "title" in view
-        assert "cards" in view
+        assert "cards" in view or "sections" in view
 
 
 def test_build_yaml_substitutions(tmp_path):

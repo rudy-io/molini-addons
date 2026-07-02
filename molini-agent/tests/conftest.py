@@ -14,6 +14,13 @@ ADDON_ROOT = Path(__file__).resolve().parent.parent
 if str(ADDON_ROOT) not in sys.path:
     sys.path.insert(0, str(ADDON_ROOT))
 
-# Le dossier blocks est dans box/ha-config/dashboards/blocks/ (relatif au repo).
-REPO_ROOT = ADDON_ROOT.parent.parent.parent  # molini/
+# Le dossier blocks : layout historique repo central (molini/box/ha-config/...)
+# OU, dans le repo standalone molini-addons, les blocs embarqués dans rootfs/
+# (ceux réellement livrés sur les box). Fallback = rootfs → les tests tournent
+# partout (prérequis CI).
+REPO_ROOT = ADDON_ROOT.parent.parent.parent  # molini/ (layout historique)
 BLOCKS_DIR = REPO_ROOT / "box" / "ha-config" / "dashboards" / "blocks"
+if not BLOCKS_DIR.is_dir():
+    BLOCKS_DIR = (
+        ADDON_ROOT / "rootfs" / "usr" / "share" / "molini" / "dashboards" / "blocks"
+    )

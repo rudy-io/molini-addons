@@ -4,7 +4,7 @@
 
 slug: molini_agent
 name: Moli Agent
-version: "0.16.0"
+version: "0.16.1"
 description: >-
   Agent Moli pour Home Assistant OS — heartbeat 5 min vers le central
   moli.energy, backups quotidiens chiffrés age + upload MinIO, et exécution

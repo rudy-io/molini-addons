@@ -51,6 +51,20 @@ class HAClient:
         except httpx.HTTPError:
             return None
 
+    async def config_entries(self) -> list[dict[str, Any]] | None:
+        """Config entries HA Core (``GET /api/config/config_entries/entry``).
+
+        Sert au garde-fou Zigbee (détection ZHA). ``None`` si l'API est
+        indisponible — best-effort, ne lève jamais.
+        """
+        try:
+            r = await self._client.get("/api/config/config_entries/entry")
+            r.raise_for_status()
+            data = r.json()
+            return data if isinstance(data, list) else None
+        except httpx.HTTPError:
+            return None
+
     async def call_service(self, domain: str, service: str, data: dict[str, Any]) -> bool:
         """Appelle un service HA Core (POST /api/services/<domain>/<service>).
 

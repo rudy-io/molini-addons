@@ -37,6 +37,7 @@ from .dashboard_builder import build_and_write, prod_gauge_scale
 from .ha_client import HAClient
 from .ha_discovery import execute_ha_provision
 from .yaml_patch import remove_top_keys_in_file
+from .zigbee import detect_zigbee_stack
 
 log = logging.getLogger("molini_agent.commands")
 
@@ -341,19 +342,27 @@ async def execute_bootstrap_stack(
     return await bootstrap_stack(cfg, payload=payload)
 
 
-async def execute_install_addon(payload: dict[str, Any] | None) -> dict[str, Any]:
+async def execute_install_addon(
+    payload: dict[str, Any] | None, cfg: Config | None = None
+) -> dict[str, Any]:
     """Installe un add-on précis depuis la white-list ``ALLOWED_ADDON_NAMES``.
 
     payload attendu::
 
         { "name": "mosquitto" | "zigbee2mqtt" | "cloudflared",
           "options": {...} (optionnel),
-          "start": true (default true) }
+          "start": true (default true),
+          "force_z2m": true (optionnel — outrepasse le garde-fou ZHA) }
 
     Lève RuntimeError si ``name`` est hors white-list — c'est l'unique mécanisme
     qui empêche un admin compromis d'installer un add-on arbitraire (un add-on
     HA peut wrapper du code Python exécuté par le superviseur, donc c'est une
     surface RCE).
+
+    Garde-fou ZHA : ``zigbee2mqtt`` est REFUSÉ si la box tourne déjà en ZHA
+    (conflit de coordinateur — cas Carole). ``force_z2m`` outrepasse (migration
+    ZHA→Z2M assumée). Détection ``unknown`` = fail-open (on ne bloque que le
+    conflit avéré).
     """
     payload = payload or {}
     name = payload.get("name")
@@ -363,6 +372,24 @@ async def execute_install_addon(payload: dict[str, Any] | None) -> dict[str, Any
         raise RuntimeError(
             f"forbidden_addon:{name}: only {sorted(ALLOWED_ADDON_NAMES)} allowed"
         )
+
+    if name == "zigbee2mqtt" and not payload.get("force_z2m"):
+        ha = (
+            HAClient(cfg.ha_url, cfg.ha_token)
+            if cfg is not None and getattr(cfg, "ha_url", None)
+            else None
+        )
+        try:
+            stack = await detect_zigbee_stack(ha)
+        finally:
+            if ha is not None:
+                await ha.close()
+        if stack in ("zha", "both"):
+            raise RuntimeError(
+                f"zha_detected_conflict: la box est en ZHA (stack={stack}) — "
+                'installer Z2M créerait un conflit de coordinateur. Passer {"force_z2m": true} '
+                "pour outrepasser (migration assumée)."
+            )
 
     options = payload.get("options")
     if options is not None and not isinstance(options, dict):
@@ -576,7 +603,7 @@ HANDLERS = {
     "tunnel_uninstall": lambda cfg, payload: execute_tunnel_uninstall(payload),
     "ha_provision": lambda cfg, payload: execute_ha_provision(cfg),
     "bootstrap_stack": lambda cfg, payload: execute_bootstrap_stack(cfg, payload),
-    "install_addon": lambda cfg, payload: execute_install_addon(payload),
+    "install_addon": lambda cfg, payload: execute_install_addon(payload, cfg),
     "patch_ha_config": lambda cfg, payload: execute_patch_ha_config(payload),
     "rebuild_dashboard": lambda cfg, payload: execute_rebuild_dashboard(cfg, payload),
 }

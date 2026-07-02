@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.16.1
+
+**Garde-fou ZHA** (audit 2026-07-02) — ne JAMAIS poser Zigbee2MQTT sur une box
+déjà en ZHA (conflit de coordinateur — cas Carole, dongle ZBT-2) :
+
+- Nouveau module `zigbee.py` : détection du stack (`zha`/`z2m`/`both`/`none`/
+  `unknown`) via les config entries HA Core (sonde ZHA) + les add-ons
+  superviseur (sonde Z2M). Best-effort, ne lève jamais.
+- `install_addon zigbee2mqtt` **refusé** si ZHA détecté
+  (`zha_detected_conflict`). Override explicite : `{"force_z2m": true}`.
+- `bootstrap_stack` **skip** Z2M si ZHA détecté (action `skipped` avec
+  `reason: zha_detected` dans le rapport) — le reste de la stack s'installe
+  normalement. Même override `force_z2m`.
+- Détection `unknown` = fail-open (une sonde KO ne bloque pas une install
+  saine — le blocage ne vise que le conflit avéré).
+- Heartbeat : `bootstrap_state.zigbee_stack` remonte le stack au central
+  (badge admin + wizard qui masque l'install Z2M sur box ZHA, à venir côté
+  central).
+- **Fix** `DEFAULT_BLOCKS` : retrait de `chauffage` (bloc white-listé mais
+  jamais livré dans rootfs/ → `rebuild_dashboard` sans payload échouait sur
+  `Block file not found`, gotcha prod 0.9.0). `DEFAULT_BLOCKS` = uniquement
+  des blocs embarqués.
+- Tests : +13 tests (`test_zigbee_guard.py`), suite verte 169/169 dans le repo
+  standalone (conftest : fallback blocs `rootfs/`, tests dashboards alignés
+  sur les blocs livrés + layout `sections`).
+- CI GitHub Actions : pytest + py_compile sur chaque push/PR (la 0.5.0 cassée
+  ne doit plus pouvoir arriver sur le store).
+
 ## 0.16.0
 
 - **Conversation Moli AI dans Assist** : l'add-on déploie un composant HA (`custom_components/moli_ai`) qui branche l'agent de conversation de Home Assistant sur le cerveau central Moli AI (`/api/agent/converse`). L'occupant peut désormais **discuter avec Moli en français** depuis Assist (état de la maison, énergie…). Auto-configuré au démarrage (central_url + token déposés par l'add-on ; marqueur `moli_ai:` dans `configuration.yaml`). Après MAJ : **redémarrer HA**, puis Réglages → Assist : choisir « Moli AI » comme agent de conversation + exposer les entités.

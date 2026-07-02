@@ -1,0 +1,28 @@
+# CI molini-addons — pytest + py_compile sur chaque push/PR.
+# Raison d'être : la release 0.5.0 est partie sur le store avec des conflits
+# de merge commités (SyntaxError au boot des box). Plus jamais.
+name: tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: molini-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps
+        run: pip install httpx "ruamel.yaml" psutil pytest pytest-asyncio
+      - name: py_compile (agent + custom component)
+        run: |
+          python -m py_compile molini_agent/*.py
+          python -m py_compile rootfs/usr/share/molini/custom_components/moli_ai/*.py
+      - name: pytest
+        run: python -m pytest tests/ -q
