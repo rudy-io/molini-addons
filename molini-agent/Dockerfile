@@ -7,7 +7,7 @@ FROM ${BUILD_FROM}
 # BUILD_VERSION (= version de config.yaml) comme build-arg ; on s'en sert pour
 # que AGENT_VERSION reflète la vraie version (sinon le heartbeat reste figé).
 ARG BUILD_VERSION
-ARG MOLINI_AGENT_VERSION=${BUILD_VERSION:-0.17.0}
+ARG MOLINI_AGENT_VERSION=${BUILD_VERSION:-0.17.1}
 ENV MOLINI_AGENT_VERSION=${MOLINI_AGENT_VERSION} \
     AGENT_VERSION=${MOLINI_AGENT_VERSION} \
     PYTHONUNBUFFERED=1 \
@@ -25,9 +25,17 @@ RUN apk add --no-cache \
         ca-certificates \
         tzdata
 
-# Deps Python
+# Deps Python.
+# ⚠️ psutil n'a pas toujours de wheel musl/aarch64 → pip compile depuis les
+# sources → il FAUT une toolchain. Sans elle le build échoue (« gcc: No such
+# file ») — bug LATENT masqué pendant des mois par le cache de layer Docker
+# (révélé le 2026-07-02 quand --pull a rafraîchi l'image de base) : une box
+# VIERGE ne pouvait pas installer l'add-on. Toolchain retirée après le pip
+# install pour garder l'image légère.
 COPY requirements.txt /tmp/requirements.txt
-RUN pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements.txt \
+RUN apk add --no-cache --virtual .build-deps gcc musl-dev python3-dev linux-headers \
+ && pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements.txt \
+ && apk del .build-deps \
  && rm /tmp/requirements.txt
 
 # Code agent (copie minimaliste, pas de tests embarqués)

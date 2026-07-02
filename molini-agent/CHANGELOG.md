@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.17.1
+
+**🔥 Fix build bloquant (bug latent depuis des mois)** : le `pip install`
+échouait sur toute box qui buildait l'image SANS cache de layer (« gcc: No
+such file » en compilant psutil depuis les sources — pas toujours de wheel
+musl/aarch64). Le cache masquait le problème tant que `requirements.txt` ne
+changeait pas et que l'image de base n'était pas rafraîchie ; le `--pull` du
+2026-07-02 l'a révélé. **Concrètement : une box VIERGE ne pouvait pas
+installer l'add-on.** Fix : toolchain de build temporaire dans le Dockerfile
+(`apk add --virtual .build-deps gcc musl-dev python3-dev linux-headers` →
+pip install → `apk del .build-deps`).
+
 ## 0.17.0
 
 **Onboarding v0.8 — pose automatique de la config HA Moli** (fini le « posé à
