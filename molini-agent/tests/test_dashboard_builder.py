@@ -249,18 +249,25 @@ def test_check_missing_entities_excludes_input_helpers():
     assert missing == []
 
 
-def test_build_yaml_reports_missing_entities_per_block():
-    """Le BuildResult expose un map block → entités manquantes."""
-    available = {"sensor.molini_power_w"}  # Très réduit, beaucoup manquera
+def test_build_yaml_reports_missing_entities_per_block(tmp_path):
+    """Le BuildResult expose un map block → entités manquantes (non-molini)."""
+    # Bloc synthétique référençant une entité NON-molini absente + une molini_
+    # (qui, elle, ne doit PAS être remontée car gérée par les packages MOLINI).
+    (tmp_path / "energie.yaml").write_text(
+        "title: Énergie\npath: energie\ncards:\n"
+        "  - type: tile\n    entity: light.inexistant\n"
+        "  - type: tile\n    entity: sensor.molini_consommation_maison\n",
+        encoding="utf-8",
+    )
     result = build_yaml(
         ["energie"],
-        blocks_dir=BLOCKS_DIR,
-        available_entity_ids=available,
+        blocks_dir=tmp_path,
+        available_entity_ids={"sensor.molini_solaire_production"},
     )
-    # Le bloc energie référence les capteurs molini_* qui ne sont pas
-    # dans `available`
     assert "energie" in result.missing_entities
-    assert any(
+    assert "light.inexistant" in result.missing_entities["energie"]
+    # Les entités MOLINI-gérées ne sont jamais signalées comme manquantes.
+    assert not any(
         e.startswith("sensor.molini_")
         for e in result.missing_entities["energie"]
     )
