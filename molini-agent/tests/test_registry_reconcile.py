@@ -240,3 +240,50 @@ def test_override_multi_sum_role_wrapped_in_list():
         {}, {"solar_power": "sensor.tuya_clamp_puissance"}, LIVE
     )
     assert detected["solar_power"] == ["sensor.tuya_clamp_puissance"]
+
+
+def test_plan_never_renames_manual_rename():
+    """M3 : un entity_id librement renommé (≠ pathologie _N) n'est JAMAIS
+    re-renommé — propriété du client, reporté en conflit."""
+    entries = [_entry("sensor.pince_edf", "molini_reseau")]
+    actions, report = plan_reconcile(entries, {"molini_reseau"})
+    assert actions == []
+    assert any("pince_edf" in c for c in report.conflicts)
+
+
+def test_plan_manual_rename_still_enabled_if_disabled():
+    """Le rename manuel est respecté, mais... une entrée disabled reste
+    intouchée aussi (on ne touche pas à ce que le client a customisé)."""
+    entries = [_entry("sensor.pince_edf", "molini_reseau", disabled_by="user")]
+    actions, report = plan_reconcile(entries, {"molini_reseau"})
+    # rename refusé → conflit ; PAS d'enable non plus (continue avant)
+    assert actions == []
+
+
+def test_expected_uids_no_power_for_non_shelly_without_override():
+    """M5 : water_heater non-Shelly SANS water_heater_power → le capteur
+    puissance n'est pas attendu (pas de tuile morte, pas de faux missing)."""
+    uids = expected_uids_for({"water_heater": "switch.legrand_contacteur"})
+    assert "molini_chauffe_eau" in uids
+    assert "molini_chauffe_eau_puissance" not in uids
+    uids2 = expected_uids_for({
+        "water_heater": "switch.legrand_contacteur",
+        "water_heater_power": "sensor.pince_ecs",
+    })
+    assert "molini_chauffe_eau_puissance" in uids2
+
+
+def test_theme_matches_le_releve_charter():
+    """Garde-fou charte : le thème Moli reste aligné sur moli.energy
+    (une mutation accidentelle ne doit pas s'auto-valider via la fixture
+    bootstrap générée)."""
+    from molini_agent.bootstrap import MOLI_HA_CONFIG_PATCH
+    t = MOLI_HA_CONFIG_PATCH["frontend"]["themes"]["Moli"]
+    assert t["primary-background-color"] == "#F2F0EA"   # fond os
+    assert t["accent-color"] == "#FFD337"               # jaune doré
+    assert t["primary-color"] == "#8A6A14"              # cuivre
+    assert t["app-header-background-color"] == "#161510"  # encre
+    assert t["ha-card-border-radius"] == "2px"
+    assert "Archivo" in t["primary-font-family"]
+    mods = MOLI_HA_CONFIG_PATCH["frontend"]["extra_module_url"]
+    assert "/local/moli-cards/moli-brand.js" in mods

@@ -74,6 +74,22 @@ async def loop(cfg: Config) -> None:
                     log.info("moli_config posé au boot — restart HA requis (piloté par le central)")
             except Exception as e:
                 log.warning("ensure_moli_ha_config au boot: %s", e)
+            # 0.19.0 — applique aussi le patch config Moli (thème Le Relevé,
+            # trusted_proxies, extra_module_url…) au boot : le rollout d'un
+            # nouveau thème suit ainsi la MAJ de l'add-on sur toute la flotte,
+            # sans dépendre d'un bootstrap_stack. Deep-merge idempotent ;
+            # comme moli_config, le restart HA qui le charge reste piloté par
+            # le central (jamais auto au boot).
+            try:
+                from .bootstrap import MOLI_HA_CONFIG_PATCH, patch_ha_config
+                pr = patch_ha_config(MOLI_HA_CONFIG_PATCH)
+                if pr.get("changed"):
+                    log.info(
+                        "config Moli patchée au boot (%s) — restart HA requis (piloté par le central)",
+                        ", ".join(pr.get("applied_keys", [])) or "modifs",
+                    )
+            except Exception as e:
+                log.warning("patch config Moli au boot: %s", e)
 
         backup_task = asyncio.create_task(backup_loop(cfg))
 

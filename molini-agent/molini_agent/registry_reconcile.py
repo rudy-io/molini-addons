@@ -35,6 +35,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -128,6 +129,11 @@ def plan_reconcile(
             freed.add(eid)
 
     # 2. Renommage canonique + réactivation des entités attendues.
+    # ⚠️ On ne renomme QUE la pathologie visée : ``<canon>_<N>`` (suffixe de
+    # collision posé par HA). Un entity_id librement renommé par le client ou
+    # l'installateur (ex. ``sensor.pince_edf`` pour ses automations) est SA
+    # propriété — reporté en conflit, jamais forcé (sinon on casserait ses
+    # automations à chaque provision, cron compris).
     for e in moli:
         uid = str(e.get("unique_id", ""))
         if uid in LEGACY_UIDS or uid not in expected_uids:
@@ -137,6 +143,11 @@ def plan_reconcile(
         canon = f"{domain}.{uid}"
 
         if eid != canon:
+            if not re.match(re.escape(canon) + r"_\d+$", eid):
+                report.conflicts.append(
+                    f"{eid} (uid={uid}) renommé manuellement — laissé tel quel"
+                )
+                continue
             occupant = by_entity_id.get(canon)
             if occupant is not None and canon not in freed:
                 occ_uid = str(occupant.get("unique_id", ""))

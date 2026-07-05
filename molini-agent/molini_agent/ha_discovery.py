@@ -485,9 +485,13 @@ def expected_uids_for(detected: dict[str, Union[str, list[str]]]) -> set[str]:
     for role in detected:
         if role in role_uids:
             uids.add(role_uids[role])
-    if "water_heater" in detected:
-        uids.add("molini_chauffe_eau")           # switch template
-        uids.add("molini_chauffe_eau_puissance")  # capteur puissance
+    wh = detected.get("water_heater")
+    if isinstance(wh, str) and wh:
+        uids.add("molini_chauffe_eau")  # switch template
+        # Le capteur puissance n'existe que s'il est dérivable (sortie Shelly)
+        # ou explicitement fourni (override water_heater_power).
+        if detected.get("water_heater_power") or _shelly_output_power_eid(wh):
+            uids.add("molini_chauffe_eau_puissance")
     return uids
 
 
@@ -540,11 +544,17 @@ async def execute_ha_provision(cfg, payload: dict[str, Any] | None = None) -> di
         # échouer la provision.
         reconcile: dict[str, Any]
         try:
+            import asyncio
             from .registry_reconcile import apply_reconcile, ws_url_from_ha_url
-            reconcile = await apply_reconcile(
-                ws_url_from_ha_url(cfg.ha_url),
-                cfg.ha_token,
-                expected_uids_for(detected),
+            # Timeout global 60 s : un WS qui pend ne doit JAMAIS geler la
+            # boucle agent (heartbeat + commandes sont séquentiels).
+            reconcile = await asyncio.wait_for(
+                apply_reconcile(
+                    ws_url_from_ha_url(cfg.ha_url),
+                    cfg.ha_token,
+                    expected_uids_for(detected),
+                ),
+                timeout=60,
             )
         except Exception as e:  # noqa: BLE001
             log.warning("registry_reconcile failed (non-bloquant): %s", e)

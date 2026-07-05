@@ -590,23 +590,40 @@ async def _reload_lovelace(cfg: Config) -> dict[str, Any]:
     return results
 
 
-async def execute_registry_reconcile(cfg: Config) -> dict[str, Any]:
+async def execute_registry_reconcile(
+    cfg: Config, payload: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Self-heal registre à la demande (sans réécrire molini_discovered.yaml).
 
     Utile pour réparer une box dont le registre a divergé (entités ``_2``,
     entrées disabled héritées) sans re-provisionner. Le set attendu est
-    recalculé depuis la discovery courante.
+    recalculé depuis la discovery courante + les overrides de rôles éventuels
+    (payload ``{"roles": {...}}`` — sinon une box 100 % overrides ne serait
+    pas réparée pour les rôles forcés).
     """
-    from .ha_discovery import discover_entities, expected_uids_for
+    from .ha_discovery import (
+        apply_role_overrides,
+        discover_entities,
+        expected_uids_for,
+    )
     from .registry_reconcile import apply_reconcile, ws_url_from_ha_url
 
     ha = HAClient(cfg.ha_url, cfg.ha_token)
     try:
-        detected = await discover_entities(ha)
+        states = await ha.states()
+        detected = await discover_entities(ha, states=states)
     finally:
         await ha.close()
-    report = await apply_reconcile(
-        ws_url_from_ha_url(cfg.ha_url), cfg.ha_token, expected_uids_for(detected)
+    roles = (payload or {}).get("roles")
+    if roles is not None:
+        live = {s.get("entity_id", "") for s in (states or [])}
+        detected, _ = apply_role_overrides(detected, roles, live)
+    # Timeout global 60 s — même raison que dans execute_ha_provision.
+    report = await asyncio.wait_for(
+        apply_reconcile(
+            ws_url_from_ha_url(cfg.ha_url), cfg.ha_token, expected_uids_for(detected)
+        ),
+        timeout=60,
     )
     out: dict[str, Any] = {"ok": True, "reconcile": report}
     if report.get("restart_pending"):
@@ -633,7 +650,7 @@ HANDLERS = {
     # payload optionnel {"roles": {...}} = overrides multi-marques (0.19.0).
     "ha_provision": lambda cfg, payload: execute_ha_provision(cfg, payload),
     # Réconciliation registre seule (self-heal sans réécrire le discovered).
-    "registry_reconcile": lambda cfg, payload: execute_registry_reconcile(cfg),
+    "registry_reconcile": lambda cfg, payload: execute_registry_reconcile(cfg, payload),
     "bootstrap_stack": lambda cfg, payload: execute_bootstrap_stack(cfg, payload),
     "install_addon": lambda cfg, payload: execute_install_addon(payload, cfg),
     "patch_ha_config": lambda cfg, payload: execute_patch_ha_config(payload),
