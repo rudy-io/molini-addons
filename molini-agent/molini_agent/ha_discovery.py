@@ -245,7 +245,10 @@ def generate_yaml(detected: dict[str, Union[str, list[str]]]) -> str:
         "solar_energy_today": ("MOLINI Solaire production aujourd'hui", "molini_solaire_production_aujourd_hui", "kWh", "energy", "total_increasing"),
         "solar_energy_total": ("MOLINI Solaire production totale", "molini_solaire_production_totale", "kWh", "energy", "total_increasing"),
         # Pince arrivée générale (Shelly 3EM/EM) — réseau signé + énergies cumulées.
-        "grid_power": ("MOLINI Réseau", "molini_reseau_w", "W", "power", "measurement"),
+        # ⚠️ unique_id DOIT == slug(name) : HA dérive l'entity_id du NAME, et les
+        # packages/dashboard référencent sensor.<slug(name)>. Voir test garde-fou
+        # test_role_spec_uid_matches_name_slug.
+        "grid_power": ("MOLINI Réseau", "molini_reseau", "W", "power", "measurement"),
         "grid_import_total": ("MOLINI Réseau soutiré total", "molini_reseau_soutire_total", "kWh", "energy", "total_increasing"),
         "grid_export_total": ("MOLINI Réseau injecté total", "molini_reseau_injecte_total", "kWh", "energy", "total_increasing"),
     }
@@ -315,14 +318,18 @@ def generate_yaml(detected: dict[str, Union[str, list[str]]]) -> str:
     if isinstance(wh, str) and wh:
         power_eid = _shelly_output_power_eid(wh)
         if power_eid:
+            # name "MOLINI Chauffe-eau" → entity_id sensor.molini_chauffe_eau
+            # (le power sensor). uid == slug(name).
             _emit_sensor(
-                "MOLINI Chauffe-eau", "molini_chauffe_eau_w", "W", "power",
+                "MOLINI Chauffe-eau", "molini_chauffe_eau", "W", "power",
                 "measurement",
                 '        state: "{{ ' + _states(power_eid) + ' | float(0) }}"',
                 _states(power_eid) + " not in ['unknown', 'unavailable', 'none']",
             )
+        # Le switch template : name "MOLINI Chauffe-eau" → switch.molini_chauffe_eau
+        # (domaine différent du sensor homonyme, pas de collision).
         switch_lines = [
-            "      - name: 'Chauffe-eau'",
+            "      - name: 'MOLINI Chauffe-eau'",
             "        unique_id: molini_chauffe_eau",
             "        state: \"{{ is_state('" + wh + "', 'on') }}\"",
             "        availability: \"{{ " + _states(wh)

@@ -193,10 +193,10 @@ async def test_discover_grid_power_3em_total_only():
 
 
 def test_generate_yaml_grid_signed_passthrough():
-    """molini_reseau_w = valeur signée brute du 3EM (pas de max/abs)."""
+    """molini_reseau (uid==slug) = valeur signée brute du 3EM (pas de max/abs)."""
     detected = {"grid_power": "sensor.shellypro3em_x_puissance"}
     y = generate_yaml(detected)
-    assert "molini_reseau_w" in y
+    assert "unique_id: molini_reseau" in y
     assert "sensor.shellypro3em_x_puissance" in y
     assert "max" not in y and "abs" not in y  # signé, pas tronqué
 
@@ -233,9 +233,9 @@ def test_generate_yaml_water_heater_switch_and_power():
     assert "unique_id: molini_chauffe_eau" in y
     assert "is_state('switch.shellypro4pm_8c4f009059e8_output_0', 'on')" in y
     assert "switch.turn_on" in y and "switch.turn_off" in y
-    # capteur puissance dérivé de la sortie Shelly
-    assert "molini_chauffe_eau_w" in y
+    # capteur puissance dérivé de la sortie Shelly (uid == slug(name))
     assert "sensor.shellypro4pm_8c4f009059e8_output_0_puissance" in y
+    assert "name: 'MOLINI Chauffe-eau'" in y  # → switch.molini_chauffe_eau
 
 
 @pytest.mark.asyncio
@@ -261,3 +261,63 @@ def test_generate_yaml_water_heater_modern_switch_section():
     assert "template:" in y
     assert "  - switch:" in y
     assert "unique_id: molini_chauffe_eau" in y
+
+
+# ─── GARDE-FOU : slug(name) == unique_id (HA dérive l'entity_id du NAME) ──────
+# Régression 0.18.0 : des capteurs avaient name "MOLINI Réseau" (→ entity_id
+# molini_reseau) mais unique_id molini_reseau_w, et les packages/dashboards
+# référençaient sensor.molini_reseau_w → entités introuvables. Ce test verrouille
+# l'invariant : pour tout capteur/switch émis, slug(name) DOIT == unique_id.
+import re as _re
+import unicodedata as _ud
+from ruamel.yaml import YAML as _YAML
+from pathlib import Path as _Path
+
+
+def _ha_slugify(name: str) -> str:
+    s = _ud.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    s = s.lower()
+    s = _re.sub(r"[^a-z0-9]+", "_", s).strip("_")
+    return s
+
+
+def _iter_named_entities(doc):
+    """(name, unique_id) de tous les template sensor/switch d'un doc HA."""
+    for item in doc.get("template", []) or []:
+        for kind in ("sensor", "switch"):
+            for ent in item.get(kind, []) or []:
+                if "name" in ent and "unique_id" in ent:
+                    yield ent["name"], ent["unique_id"]
+
+
+def test_generated_discovered_slug_matches_unique_id():
+    """Tout capteur/switch de molini_discovered.yaml : slug(name) == unique_id."""
+    detected = {
+        "linky_power": "sensor.zlinky_puissance",
+        "solar_power": ["sensor.inverter_pv_power"],
+        "grid_power": "sensor.shellypro3em_x_puissance",
+        "grid_import_total": "sensor.shellypro3em_x_energie",
+        "grid_export_total": "sensor.shellypro3em_x_energie_restituee",
+        "water_heater": "switch.shellypro4pm_x_output_0",
+    }
+    doc = _YAML(typ="safe").load(generate_yaml(detected))
+    pairs = list(_iter_named_entities(doc))
+    assert pairs, "aucune entité générée"
+    for name, uid in pairs:
+        assert _ha_slugify(name) == uid, (
+            f"slug({name!r})={_ha_slugify(name)!r} != unique_id {uid!r} "
+            f"→ entity_id ne matchera pas les références packages/dashboard"
+        )
+
+
+def test_package_molini_energy_slug_matches_unique_id():
+    """Idem pour les capteurs template du package de base molini_energy.yaml."""
+    pkg = (
+        _Path(__file__).resolve().parents[1]
+        / "rootfs/usr/share/molini/packages/molini_energy.yaml"
+    )
+    doc = _YAML(typ="safe").load(pkg.read_text(encoding="utf-8"))
+    for name, uid in _iter_named_entities(doc):
+        assert _ha_slugify(name) == uid, (
+            f"molini_energy.yaml : slug({name!r})={_ha_slugify(name)!r} != {uid!r}"
+        )

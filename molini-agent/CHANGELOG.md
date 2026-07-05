@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.18.1
+
+**🐛 Fix nommage entity_id (régression 0.18.0)** : HA dérive l'`entity_id` d'un
+capteur template de son **`name`** (slugifié), pas de son `unique_id`. Plusieurs
+capteurs 0.18.0 avaient `slug(name) ≠ unique_id ≠ référence` (ex. name « MOLINI
+Réseau » → `sensor.molini_reseau`, mais packages/dashboard référençaient
+`molini_reseau_w`) → capteurs conso/autoconso/chauffe-eau introuvables. Aligné
+`slug(name) == unique_id == référence` pour `molini_reseau`, `molini_chauffe_eau`
+(+ switch `switch.molini_chauffe_eau`), `molini_taux_autoconsommation`. **Test
+garde-fou** ajouté (`test_*_slug_matches_unique_id`) pour verrouiller l'invariant.
+
 ## 0.18.0
 
 **⚡ Consommation totale + autoconsommation via pince Shelly Pro 3EM** (débloque

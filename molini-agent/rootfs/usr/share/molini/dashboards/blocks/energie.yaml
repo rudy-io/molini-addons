@@ -89,7 +89,7 @@ sections:
               icon: mdi:home-lightning-bolt
               color: green
             - type: tile
-              entity: sensor.molini_taux_autoconso
+              entity: sensor.molini_taux_autoconsommation
               name: Taux autoconso
               icon: mdi:sun-angle
               color: yellow
@@ -153,7 +153,7 @@ sections:
                   tap_action:
                     action: toggle
                 - type: tile
-                  entity: sensor.molini_chauffe_eau_w
+                  entity: sensor.molini_chauffe_eau
                   name: Puissance
                   icon: mdi:flash
             - type: markdown
