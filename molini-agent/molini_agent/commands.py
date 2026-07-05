@@ -590,6 +590,30 @@ async def _reload_lovelace(cfg: Config) -> dict[str, Any]:
     return results
 
 
+async def execute_registry_reconcile(cfg: Config) -> dict[str, Any]:
+    """Self-heal registre à la demande (sans réécrire molini_discovered.yaml).
+
+    Utile pour réparer une box dont le registre a divergé (entités ``_2``,
+    entrées disabled héritées) sans re-provisionner. Le set attendu est
+    recalculé depuis la discovery courante.
+    """
+    from .ha_discovery import discover_entities, expected_uids_for
+    from .registry_reconcile import apply_reconcile, ws_url_from_ha_url
+
+    ha = HAClient(cfg.ha_url, cfg.ha_token)
+    try:
+        detected = await discover_entities(ha)
+    finally:
+        await ha.close()
+    report = await apply_reconcile(
+        ws_url_from_ha_url(cfg.ha_url), cfg.ha_token, expected_uids_for(detected)
+    )
+    out: dict[str, Any] = {"ok": True, "reconcile": report}
+    if report.get("restart_pending"):
+        out["ha_restart_pending"] = True
+    return out
+
+
 async def _run_sync(fn):
     return fn()
 
@@ -606,7 +630,10 @@ HANDLERS = {
     "enable_auto_update": lambda cfg, payload: execute_enable_auto_update(),
     "tunnel_install": lambda cfg, payload: execute_tunnel_install(payload),
     "tunnel_uninstall": lambda cfg, payload: execute_tunnel_uninstall(payload),
-    "ha_provision": lambda cfg, payload: execute_ha_provision(cfg),
+    # payload optionnel {"roles": {...}} = overrides multi-marques (0.19.0).
+    "ha_provision": lambda cfg, payload: execute_ha_provision(cfg, payload),
+    # Réconciliation registre seule (self-heal sans réécrire le discovered).
+    "registry_reconcile": lambda cfg, payload: execute_registry_reconcile(cfg),
     "bootstrap_stack": lambda cfg, payload: execute_bootstrap_stack(cfg, payload),
     "install_addon": lambda cfg, payload: execute_install_addon(payload, cfg),
     "patch_ha_config": lambda cfg, payload: execute_patch_ha_config(payload),

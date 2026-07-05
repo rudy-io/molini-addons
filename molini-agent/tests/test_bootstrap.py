@@ -253,40 +253,21 @@ async def test_bootstrap_stack_idempotent(mock_supervisor, mock_yaml_patch):
         ),
     }
     # Pre-create configuration.yaml with the patches already applied.
-    # Must match MOLI_HA_CONFIG_PATCH exactly (v0.12.0: no panel_custom,
-    # kiosk-mode.js added to extra_module_url).
+    # Le bloc patché est GÉNÉRÉ depuis MOLI_HA_CONFIG_PATCH (source de vérité)
+    # pour que ce test d'idempotence ne dérive plus à chaque évolution du
+    # thème/patch (leçon 0.19.0 : fixture figée = faux négatif).
+    import io as _io
+    from ruamel.yaml import YAML as _YAML
+    from molini_agent.bootstrap import MOLI_HA_CONFIG_PATCH
+    _buf = _io.StringIO()
+    _y = _YAML()
+    _y.default_flow_style = False
+    _y.dump(MOLI_HA_CONFIG_PATCH, _buf)
     mock_yaml_patch.write_text(
         "default_config:\n"
-        "http:\n"
-        "  use_x_forwarded_for: true\n"
-        "  trusted_proxies:\n"
-        "    - 172.30.0.0/16\n"
-        "recorder:\n"
-        "  purge_keep_days: 14\n"
-        "frontend:\n"
-        "  extra_module_url:\n"
-        "    - /local/moli-cards/button-card.js\n"
-        "    - /local/moli-cards/apexcharts-card.js\n"
-        "    - /local/moli-cards/kiosk-mode.js\n"
-        "  themes:\n"
-        "    Moli:\n"
-        "      primary-color: '#1d9e75'\n"
-        "      accent-color: '#f5a623'\n"
-        "      app-header-background-color: '#0E2238'\n"
-        "      app-header-text-color: '#e8eef2'\n"
-        "      primary-background-color: '#0b1a2c'\n"
-        "      secondary-background-color: '#0E2238'\n"
-        "      divider-color: 'rgba(255,255,255,0.08)'\n"
-        "      card-background-color: '#10243a'\n"
-        "      ha-card-background: '#10243a'\n"
-        "      ha-card-border-radius: '16px'\n"
-        "      ha-card-box-shadow: '0 2px 12px rgba(0,0,0,0.35)'\n"
-        "      primary-text-color: '#e8eef2'\n"
-        "      secondary-text-color: '#9fb2c0'\n"
-        "      state-icon-color: '#1d9e75'\n"
-        "      paper-item-icon-color: '#9fb2c0'\n"
+        + _buf.getvalue()
         # Blocs Moli (v0.8 / 0.17.0) — une box idempotente les a déjà
-        "homeassistant:\n"
+        + "homeassistant:\n"
         "  packages: !include_dir_named packages\n"
         "lovelace:\n"
         "  dashboards:\n"

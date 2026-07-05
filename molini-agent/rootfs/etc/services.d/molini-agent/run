@@ -107,6 +107,9 @@ if [ -d "${CARDS_SRC}" ]; then
   else
     bashio::log.warning "Aucune carte à déployer depuis ${CARDS_SRC}"
   fi
+  # Fontes de marque (Archivo variable — servie en local, déclarée par
+  # moli-brand.js, référencée par le thème Moli).
+  cp -f "${CARDS_SRC}"/*.woff2 "${CARDS_DST}"/ 2>/dev/null || true
 fi
 
 # ─── Déploiement du composant de conversation Moli AI (Assist → cerveau central) ─────────

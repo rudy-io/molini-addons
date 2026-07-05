@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.19.0
+
+**🏭 Systématisation de la brique énergie (multi-marques) + charte Le Relevé.**
+
+- **Self-heal registre** (`registry_reconcile.py`, automatise la récupération
+  manuelle du post-mortem 0.18.x) : après chaque `ha_provision`, l'agent
+  renomme les entités Moli vers leur entity_id canonique
+  (`<domaine>.<unique_id>`, rename WS direct — la primitive fiable), purge les
+  uids **legacy** (liste explicite, jamais déduite), réactive les entrées
+  `disabled_by: user` héritées (→ `ha_restart_pending` reporté au central).
+  Aussi exposé en commande dédiée `registry_reconcile`. Dépendance :
+  `websockets` (le registre n'est pas exposé en REST).
+- **Overrides de rôles** (`ha_provision` payload `{"roles": {...}}`) : la
+  réponse universelle aux marques hors patterns — l'admin désigne l'entité
+  (`grid_power`, `water_heater`, `water_heater_power`, solaire, linky…) et
+  l'agent la câble. Validation stricte (rôle connu + domaine + entité vivante,
+  sinon `overrides_ignored`) ; `null` désactive un rôle. La détection AUTO du
+  chauffe-eau reste limitée aux sorties Shelly (sûreté) — l'override est le
+  chemin explicite pour les autres marques (contacteur + capteur dédiés).
+- **Thème Moli = charte « Le Relevé »** (moli.energy) : fond os `#F2F0EA`,
+  encre `#161510`, accent jaune doré `#FFD337`, cuivre `#8A6A14`, angles vifs
+  2px, bordures fines sans ombres, fonte **Archivo** (variable, embarquée et
+  servie en local via `moli-brand.js` — zéro requête externe). Dashboard
+  énergie recoloré (or = production, encre = conso, brique = alerte). Le patch
+  réécrit toutes les clés de l'ancien thème navy.
+- Tests : +17 (reconcile plan pur, overrides, garde-fous
+  `PACKAGE_TEMPLATE_UIDS`↔package et legacy∩expected=∅) ; fixture idempotence
+  bootstrap désormais générée depuis `MOLI_HA_CONFIG_PATCH` (anti-drift).
+  Suite 207/207.
+
 ## 0.18.2
 
 **🐛 Fix collision unique_id chauffe-eau (régression 0.18.1)** : le capteur de
