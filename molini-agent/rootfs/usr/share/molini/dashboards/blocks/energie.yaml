@@ -30,34 +30,136 @@ sections:
               - from: __PROD_SEG2__
                 color: "#1d9e75"
 
-          # Soutiré réseau = ce qu'elle TIRE du réseau (= payant EDF). À 0 quand le
-          # solaire couvre tout. La conso TOTALE (autoconso comprise) n'est PAS
-          # mesurable par le Linky seul → elle arrivera avec la pince de conso.
-          - type: gauge
+          # Conso totale de la maison (production + réseau) SI la pince est là,
+          # sinon on retombe sur la jauge réseau soutiré (une seule des deux
+          # s'affiche — la grille absorbe la carte masquée).
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: sensor.molini_consommation_maison
+                state_not: unavailable
+            card:
+              type: gauge
+              entity: sensor.molini_consommation_maison
+              name: Consommation
+              needle: true
+              min: 0
+              max: __PROD_MAX__
+              segments:
+                - from: 0
+                  color: "#1d9e75"
+                - from: __PROD_SEG1__
+                  color: "#ba7517"
+                - from: __PROD_SEG2__
+                  color: "#e24b4a"
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: sensor.molini_consommation_maison
+                state: unavailable
+            card:
+              type: gauge
+              entity: sensor.molini_reseau_soutire
+              name: Réseau (EDF)
+              needle: true
+              min: 0
+              max: 9000
+              segments:
+                - from: 0
+                  color: "#1d9e75"
+                - from: 3000
+                  color: "#ba7517"
+                - from: 6000
+                  color: "#e24b4a"
+
+      # Bandeau autoconsommation — n'apparaît que si la pince est là.
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: sensor.molini_consommation_maison
+            state_not: unavailable
+        card:
+          type: grid
+          columns: 3
+          square: false
+          cards:
+            - type: tile
+              entity: sensor.molini_autoconsommation
+              name: Autoconsommée
+              icon: mdi:home-lightning-bolt
+              color: green
+            - type: tile
+              entity: sensor.molini_taux_autoconso
+              name: Taux autoconso
+              icon: mdi:sun-angle
+              color: yellow
+            - type: tile
+              entity: sensor.molini_couverture_solaire
+              name: Couverture solaire
+              icon: mdi:leaf
+              color: green
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: tile
             entity: sensor.molini_reseau_soutire
-            name: Réseau (EDF)
-            needle: true
-            min: 0
-            max: 9000
-            segments:
-              - from: 0
-                color: "#1d9e75"
-              - from: 3000
-                color: "#ba7517"
-              - from: 6000
-                color: "#e24b4a"
+            name: Soutiré (EDF)
+            icon: mdi:transmission-tower-export
+            color: red
+          - type: tile
+            entity: sensor.molini_reseau_injecte
+            name: Injecté (surplus)
+            icon: mdi:transmission-tower-import
+            color: green
 
       - type: markdown
         content: >
           ⚡ **Produit aujourd'hui :** {{ states('sensor.molini_solaire_production_aujourd_hui') }} kWh.
+          {% if states('sensor.molini_consommation_jour') not in ['unknown','unavailable'] %}
+          🏠 **Consommé :** {{ states('sensor.molini_consommation_jour') }} kWh.
+          {% endif %}
 
 
           🔌 **Tiré du réseau aujourd'hui :** {{ states('sensor.molini_soutire_jour') }} kWh —
           soit ~**{{ (states('sensor.molini_soutire_jour') | float(0) * __PRIX_KWH__) | round(2) }} €**
           payés à EDF *(tarif __PRIX_KWH_FR__ €/kWh)*.
 
-
-          *Consommation totale & autoconsommation : disponibles dès l'installation de la pince de mesure.*
+  # ── Chauffe-eau : pilotage manuel (tant que les automatisations ne sont pas faites)
+  - type: grid
+    cards:
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: switch.molini_chauffe_eau
+            state_not: unavailable
+        card:
+          type: vertical-stack
+          cards:
+            - type: heading
+              heading: Chauffe-eau
+              heading_style: title
+              icon: mdi:water-boiler
+            - type: grid
+              columns: 2
+              square: false
+              cards:
+                - type: tile
+                  entity: switch.molini_chauffe_eau
+                  name: Chauffe-eau
+                  icon: mdi:water-boiler
+                  color: orange
+                  tap_action:
+                    action: toggle
+                - type: tile
+                  entity: sensor.molini_chauffe_eau_w
+                  name: Puissance
+                  icon: mdi:flash
+            - type: markdown
+              content: >
+                💡 Bouton manuel marche/arrêt du chauffe-eau. Le pilotage
+                automatique (heures creuses / surplus solaire) sera ajouté ensuite.
 
   - type: grid
     cards:
@@ -83,15 +185,19 @@ sections:
             name: Production
             type: area
             color: "#1d9e75"
+          - entity: sensor.molini_consommation_maison
+            name: Consommation
+            type: line
+            color: "#ba7517"
           - entity: sensor.molini_reseau_soutire
-            name: Réseau (EDF)
+            name: Soutiré (EDF)
             type: line
             color: "#e24b4a"
 
   - type: grid
     cards:
       - type: heading
-        heading: Réseau (côté EDF)
+        heading: Détail énergie
         heading_style: title
 
       - type: entities
@@ -99,16 +205,16 @@ sections:
         entities:
           - entity: sensor.molini_solaire_production
             name: Production solaire
+          - entity: sensor.molini_consommation_maison
+            name: Consommation maison
+          - entity: sensor.molini_autoconsommation
+            name: Autoconsommation
           - entity: sensor.molini_reseau_soutire
             name: Tiré du réseau (payant EDF)
+          - entity: sensor.molini_reseau_injecte
+            name: Injecté au réseau (surplus)
           - entity: sensor.molini_soutire_jour
-            name: Réseau aujourd'hui
-
-      - type: markdown
-        content: >
-          ℹ️ La **consommation totale** et l'**autoconsommation** apparaîtront ici
-          dès l'installation de la pince de mesure sur le tableau — le Linky ne voit
-          que les échanges réseau, pas le solaire autoconsommé.
+            name: Réseau tiré aujourd'hui
 
   - type: grid
     cards:

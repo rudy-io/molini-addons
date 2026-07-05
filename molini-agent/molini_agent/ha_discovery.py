@@ -84,6 +84,25 @@ PATTERNS: dict[str, list[str]] = {
         r"^sensor\.solaredge[\w_]*lifetime_energy$",
         r"^sensor\.solarman[\w_]*total_production$",
     ],
+    # ─── Pince de mesure sur l'arrivée générale (Shelly Pro 3EM / EM) ──────
+    # Puissance réseau SIGNÉE : > 0 = soutiré (on TIRE du réseau), < 0 = injecté
+    # (surplus PV renvoyé). Le tore étant sur l'arrivée générale, on a
+    # réseau = conso − production → conso = production + réseau. C'est ce qui
+    # débloque la conso totale + l'autoconsommation (invisibles au Linky seul).
+    "grid_power": [
+        r"^sensor\.shellypro3em_[0-9a-f]+_puissance$",
+        r"^sensor\.shellyem_[0-9a-f]+_power$",
+        r"^sensor\.shelly_?em[0-9a-f_]*_power$",
+    ],
+    # Énergie cumulée soutirée / injectée mesurée par la pince (kWh, précis).
+    "grid_import_total": [
+        r"^sensor\.shellypro3em_[0-9a-f]+_energie$",
+        r"^sensor\.shellyem_[0-9a-f]+_energy$",
+    ],
+    "grid_export_total": [
+        r"^sensor\.shellypro3em_[0-9a-f]+_energie_restituee$",
+        r"^sensor\.shellyem_[0-9a-f]+_returned_energy$",
+    ],
 }
 
 # Rôles dont la valeur est la SOMME de toutes les entités détectées (multi-onduleurs).
@@ -134,6 +153,51 @@ def _find_all_entities(
     return found
 
 
+# Détection du chauffe-eau (charge pilotée) : une SORTIE DE RELAIS SHELLY
+# (…_output_N) dont l'entity_id ou le nom convivial contient un mot-clé fort.
+# L'installateur renomme la sortie pilotée en « Chauffe-eau » (référentiel Moli)
+# → on l'expose via l'alias stable switch.molini_chauffe_eau.
+#
+# SÛRETÉ (maison occupée) : on ne considère QUE des sorties Shelly (`_output_N`,
+# power dérivable) — jamais un switch quelconque de la maison — et on exige un
+# mot-clé FORT (pas de `ecs`/`ballon` nu qui matcherait un éclairage « Ballon »).
+_WATER_HEATER_RE = re.compile(
+    r"(chauffe[\s_-]?eau|cumulus|water[\s_-]?heater|"
+    r"ballon[\s_-]?(?:eau|ecs|d['\s_-]?eau)|\becs\b|chauffe_eau)",
+    re.IGNORECASE,
+)
+
+
+def _find_water_heater_switch(states: list[dict[str, Any]]) -> Optional[str]:
+    """Sortie de relais Shelly (`_output_N`) vivante dont l'entity_id ou le
+    friendly_name matche un mot-clé chauffe-eau. Renvoie None si aucune — on
+    n'expose jamais un switch non-Shelly (sûreté)."""
+    for s in states:
+        eid = s.get("entity_id", "")
+        if not eid.startswith("switch.") or not _is_live(s.get("state")):
+            continue
+        # Sûreté : uniquement des sorties Shelly (power dérivable) → jamais un
+        # switch maison arbitraire qu'un toggle pourrait couper par erreur.
+        if _shelly_output_power_eid(eid) is None:
+            continue
+        fname = str((s.get("attributes") or {}).get("friendly_name", "") or "")
+        if _WATER_HEATER_RE.search(eid) or _WATER_HEATER_RE.search(fname):
+            return eid
+    return None
+
+
+def _shelly_output_power_eid(switch_eid: str) -> Optional[str]:
+    """Dérive le sensor de puissance d'une sortie Shelly (Pro 4PM / 1PM).
+
+    ``switch.shellypro4pm_xxx_output_0`` → ``sensor.shellypro4pm_xxx_output_0_puissance``.
+    Retourne None si l'entity_id ne suit pas le schéma d'une sortie Shelly.
+    """
+    m = re.match(r"^switch\.(.+_output_\d+)$", switch_eid)
+    if m:
+        return "sensor." + m.group(1) + "_puissance"
+    return None
+
+
 async def discover_entities(ha: HAClient) -> dict[str, Union[str, list[str]]]:
     states = await ha.states()
     if not states:
@@ -151,6 +215,10 @@ async def discover_entities(ha: HAClient) -> dict[str, Union[str, list[str]]]:
             if eid:
                 found[role] = eid
                 log.info("ha_discovery: %s → %s", role, eid)
+    wh = _find_water_heater_switch(states)
+    if wh:
+        found["water_heater"] = wh
+        log.info("ha_discovery: water_heater → %s", wh)
     return found
 
 
@@ -170,19 +238,42 @@ def generate_yaml(detected: dict[str, Union[str, list[str]]]) -> str:
         "linky_hp": ("MOLINI Index HP", "molini_index_hp", "kWh", "energy", "total_increasing"),
         "tempo_today": ("MOLINI Tempo aujourd'hui", "molini_tempo_today", None, None, None),
         "tempo_tomorrow": ("MOLINI Tempo demain", "molini_tempo_tomorrow", None, None, None),
-        "solar_power": ("MOLINI Solaire production", "molini_solar_power_w", "W", "power", "measurement"),
-        "solar_energy_today": ("MOLINI Solaire production aujourd'hui", "molini_solar_energy_today", "kWh", "energy", "total_increasing"),
-        "solar_energy_total": ("MOLINI Solaire production totale", "molini_solar_energy_total", "kWh", "energy", "total_increasing"),
+        # Nommage FR canonique — aligné sur le dashboard, capacities.py,
+        # commands.py, le panel JS et le rapport central. (Consolidation des
+        # sources de vérité éclatées : plus de molini_solar_power_w.)
+        "solar_power": ("MOLINI Solaire production", "molini_solaire_production", "W", "power", "measurement"),
+        "solar_energy_today": ("MOLINI Solaire production aujourd'hui", "molini_solaire_production_aujourd_hui", "kWh", "energy", "total_increasing"),
+        "solar_energy_total": ("MOLINI Solaire production totale", "molini_solaire_production_totale", "kWh", "energy", "total_increasing"),
+        # Pince arrivée générale (Shelly 3EM/EM) — réseau signé + énergies cumulées.
+        "grid_power": ("MOLINI Réseau", "molini_reseau_w", "W", "power", "measurement"),
+        "grid_import_total": ("MOLINI Réseau soutiré total", "molini_reseau_soutire_total", "kWh", "energy", "total_increasing"),
+        "grid_export_total": ("MOLINI Réseau injecté total", "molini_reseau_injecte_total", "kWh", "energy", "total_increasing"),
     }
 
-    out: list[str] = [
+    header: list[str] = [
         "# MOLINI — molini_discovered.yaml",
         "# Auto-généré par l'agent (commande ha_provision). NE PAS ÉDITER.",
         "# Surcharge les sensors molini_* des packages avec les entity_id détectés.",
         "",
-        "template:",
-        "  - sensor:",
     ]
+
+    sensor_lines: list[str] = []
+
+    def _emit_sensor(
+        name: str, uid: str, unit: Optional[str], dc: Optional[str],
+        sc: Optional[str], state: str, avail: str,
+    ) -> None:
+        sensor_lines.append("      - name: '" + _yaml_quote(name) + "'")
+        sensor_lines.append("        unique_id: " + uid)
+        if unit:
+            sensor_lines.append('        unit_of_measurement: "' + unit + '"')
+        if dc:
+            sensor_lines.append("        device_class: " + dc)
+        if sc:
+            sensor_lines.append("        state_class: " + sc)
+        sensor_lines.append(state)
+        sensor_lines.append('        availability: "{{ ' + avail + ' }}"')
+        sensor_lines.append("")
 
     for role, eid in detected.items():
         spec = role_specs.get(role)
@@ -193,39 +284,71 @@ def generate_yaml(detected: dict[str, Union[str, list[str]]]) -> str:
         if not eids:
             continue
 
-        out.append("      - name: '" + _yaml_quote(name) + "'")
-        out.append("        unique_id: " + uid)
-        if unit:
-            out.append('        unit_of_measurement: "' + unit + '"')
-        if dc:
-            out.append("        device_class: " + dc)
-        if sc:
-            out.append("        state_class: " + sc)
-
         if role in MULTI_SUM_ROLES:
             terms = " + ".join("(" + _states(e) + " | float(0))" for e in eids)
-            out.append('        state: "{{ ' + terms + ' }}"')
+            state = '        state: "{{ ' + terms + ' }}"'
         elif role in ("linky_hc", "linky_hp"):
             e = eids[0]
-            out.append(
+            state = (
                 "        state: >\n"
                 "          {% set v = " + _states(e) + " | float(0) %}\n"
                 "          {{ (v / 1000) if v > " + str(WH_TO_KWH_THRESHOLD) + " else v }}"
             )
         elif role in ("tempo_today", "tempo_tomorrow"):
             e = eids[0]
-            out.append("        state: >\n          {{ " + _states(e) + " | upper }}")
+            state = "        state: >\n          {{ " + _states(e) + " | upper }}"
         else:
             e = eids[0]
-            out.append('        state: "{{ ' + _states(e) + ' }}"')
+            state = '        state: "{{ ' + _states(e) + ' }}"'
 
         av = " or ".join(
             _states(e) + " not in ['unknown', 'unavailable', 'none']" for e in eids
         )
-        out.append('        availability: "{{ ' + av + ' }}"')
-        out.append("")
+        _emit_sensor(name, uid, unit, dc, sc, state, av)
 
-    return "\n".join(out) + "\n"
+    # ─── Chauffe-eau : capteur de puissance (Shelly) + interrupteur alias ──
+    # Format MODERNE `template: - switch:` (et non le legacy `switch: platform:
+    # template`) → rechargé par template.reload lors du ha_provision, sans
+    # nécessiter un redémarrage HA complet.
+    switch_lines: list[str] = []
+    wh = detected.get("water_heater")
+    if isinstance(wh, str) and wh:
+        power_eid = _shelly_output_power_eid(wh)
+        if power_eid:
+            _emit_sensor(
+                "MOLINI Chauffe-eau", "molini_chauffe_eau_w", "W", "power",
+                "measurement",
+                '        state: "{{ ' + _states(power_eid) + ' | float(0) }}"',
+                _states(power_eid) + " not in ['unknown', 'unavailable', 'none']",
+            )
+        switch_lines = [
+            "      - name: 'Chauffe-eau'",
+            "        unique_id: molini_chauffe_eau",
+            "        state: \"{{ is_state('" + wh + "', 'on') }}\"",
+            "        availability: \"{{ " + _states(wh)
+            + " not in ['unknown', 'unavailable', 'none'] }}\"",
+            "        turn_on:",
+            "          - service: switch.turn_on",
+            "            target:",
+            "              entity_id: " + wh,
+            "        turn_off:",
+            "          - service: switch.turn_off",
+            "            target:",
+            "              entity_id: " + wh,
+            "",
+        ]
+
+    parts: list[str] = list(header)
+    if sensor_lines or switch_lines:
+        parts.append("template:")
+    if sensor_lines:
+        parts.append("  - sensor:")
+        parts.extend(sensor_lines)
+    if switch_lines:
+        parts.append("  - switch:")
+        parts.extend(switch_lines)
+
+    return "\n".join(parts) + "\n"
 
 
 async def _trigger_ha_reload(ha_url: str, ha_token: str) -> dict[str, Any]:

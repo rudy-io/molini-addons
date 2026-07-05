@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.18.0
+
+**⚡ Consommation totale + autoconsommation via pince Shelly Pro 3EM** (débloque
+ce que le Linky seul ne pouvait pas mesurer — modèle retiré en 0.15.0 faute de
+pince, ressuscité ici avec une mesure réseau précise et signée) :
+
+- **ha_discovery** : nouveaux rôles génériques (aucune MAC en dur) —
+  `grid_power` (Shelly Pro 3EM/EM, puissance réseau **signée** : >0 soutiré,
+  <0 injecté), `grid_import_total` / `grid_export_total` (énergies cumulées),
+  et détection du **chauffe-eau** (switch renommé « Chauffe-eau » → alias stable
+  `switch.molini_chauffe_eau` + capteur `sensor.molini_chauffe_eau_w`).
+- **Consolidation des sources de vérité** : le solaire repasse sur le nommage FR
+  canonique (`molini_solaire_production*`, aligné dashboard/panel/rapport) —
+  plus de `molini_solar_power_w` divergent.
+- **Package `molini_energy`** : `molini_consommation_maison` (= production +
+  réseau), `molini_autoconsommation`, `molini_taux_autoconso`,
+  `molini_couverture_solaire`, soutiré/injecté temps réel + compteurs jour
+  (3EM). Dégradation gracieuse : sans pince, repli Linky et conso masquée (on
+  n'invente rien).
+- **Dashboard Énergie** : section consommation + autoconso, courbe 24 h
+  prod/conso/réseau, **carte chauffe-eau avec bouton marche/arrêt manuel**,
+  retrait des placeholders « pince à venir ».
+
 ## 0.17.1
 
 **🔥 Fix build bloquant (bug latent depuis des mois)** : le `pip install`

@@ -210,11 +210,14 @@ def check_missing_entities(
         eid
         for eid in referenced
         if eid not in available_entity_ids
-        # On exclut input_* / scene.molini_* / sensor.molini_* qui sont
-        # gérés par packages MOLINI — ils peuvent être absents si pas
-        # encore reload, c'est normal au premier déploiement.
+        # On exclut input_* / *.molini_* qui sont gérés par les packages MOLINI
+        # (ha_provision / molini_energy) — ils peuvent être absents le temps du
+        # reload, c'est normal au premier déploiement (conso, autoconso,
+        # chauffe-eau… posés juste après le rebuild).
         and not eid.startswith("input_")
         and not eid.startswith("scene.molini_")
+        and not eid.startswith("sensor.molini_")
+        and not eid.startswith("switch.molini_")
     )
 
 
