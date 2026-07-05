@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.18.2
+
+**🐛 Fix collision unique_id chauffe-eau (régression 0.18.1)** : le capteur de
+puissance ET le switch chauffe-eau partageaient `unique_id: molini_chauffe_eau`
+(même plateforme `template`) → collision registre → entités `_2` en cascade
+(y compris réseau/taux). Le capteur passe à `molini_chauffe_eau_puissance`
+(`sensor.molini_chauffe_eau_puissance`), le switch garde `molini_chauffe_eau`
+(`switch.molini_chauffe_eau`). **Garde-fou** `test_no_duplicate_unique_ids`
+ajouté (unicité des unique_id à travers discovered + package).
+
+
 ## 0.18.1
 
 **🐛 Fix nommage entity_id (régression 0.18.0)** : HA dérive l'`entity_id` d'un

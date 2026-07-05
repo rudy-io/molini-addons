@@ -318,11 +318,14 @@ def generate_yaml(detected: dict[str, Union[str, list[str]]]) -> str:
     if isinstance(wh, str) and wh:
         power_eid = _shelly_output_power_eid(wh)
         if power_eid:
-            # name "MOLINI Chauffe-eau" → entity_id sensor.molini_chauffe_eau
-            # (le power sensor). uid == slug(name).
+            # ⚠️ uid DISTINCT du switch (même plateforme `template`) : le switch
+            # utilise molini_chauffe_eau, le capteur DOIT être différent sinon
+            # collision d'unique_id → entités _2 en cascade. Voir garde-fou
+            # test_no_duplicate_unique_ids. name "MOLINI Chauffe-eau puissance"
+            # → sensor.molini_chauffe_eau_puissance.
             _emit_sensor(
-                "MOLINI Chauffe-eau", "molini_chauffe_eau", "W", "power",
-                "measurement",
+                "MOLINI Chauffe-eau puissance", "molini_chauffe_eau_puissance",
+                "W", "power", "measurement",
                 '        state: "{{ ' + _states(power_eid) + ' | float(0) }}"',
                 _states(power_eid) + " not in ['unknown', 'unavailable', 'none']",
             )

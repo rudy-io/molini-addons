@@ -321,3 +321,37 @@ def test_package_molini_energy_slug_matches_unique_id():
         assert _ha_slugify(name) == uid, (
             f"molini_energy.yaml : slug({name!r})={_ha_slugify(name)!r} != {uid!r}"
         )
+
+
+def _all_unique_ids(doc):
+    ids = []
+    for item in doc.get("template", []) or []:
+        for kind in ("sensor", "switch"):
+            for ent in item.get(kind, []) or []:
+                if "unique_id" in ent:
+                    ids.append(ent["unique_id"])
+    return ids
+
+
+def test_no_duplicate_unique_ids_discovered_and_package():
+    """GARDE-FOU : aucun unique_id dupliqué à travers discovered + package.
+    Régression 0.18.1 : le capteur puissance chauffe-eau ET le switch avaient
+    tous deux uid molini_chauffe_eau (même plateforme template) → collision →
+    entités _2 en cascade."""
+    detected = {
+        "linky_power": "sensor.zlinky_puissance",
+        "linky_soutire_total": "sensor.zlinky_consommation",
+        "solar_power": ["sensor.inverter_pv_power"],
+        "grid_power": "sensor.shellypro3em_x_puissance",
+        "grid_import_total": "sensor.shellypro3em_x_energie",
+        "grid_export_total": "sensor.shellypro3em_x_energie_restituee",
+        "water_heater": "switch.shellypro4pm_x_output_0",
+    }
+    disc = _YAML(typ="safe").load(generate_yaml(detected))
+    pkg = _YAML(typ="safe").load(
+        (_Path(__file__).resolve().parents[1]
+         / "rootfs/usr/share/molini/packages/molini_energy.yaml").read_text(encoding="utf-8")
+    )
+    ids = _all_unique_ids(disc) + _all_unique_ids(pkg)
+    dups = {u for u in ids if ids.count(u) > 1}
+    assert not dups, f"unique_id dupliqués (collision registre HA) : {dups}"
