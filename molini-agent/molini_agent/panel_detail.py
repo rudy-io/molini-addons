@@ -88,12 +88,13 @@ def group_panels(entity_ids: set[str]) -> list[dict[str, Any]]:
 
 
 def _panel_bg(ceiling_w: int) -> str:
-    # fond qui se remplit par le bas selon la prod (vert, ambre si < 20 %).
+    # Charte Le Relevé : la carte se remplit d'or par le bas selon la prod
+    # (jaune doré #FFD337 ; ambre hover #EFC226 si < 20 %), sur fond carte os.
     return (
         "[[[ const w = Number(entity.state) || 0; "
         "const pct = Math.min(100, Math.round(w / " + str(ceiling_w) + " * 100)); "
-        "const c = pct < 20 ? '186,117,23' : '29,158,117'; "
-        "return `linear-gradient(to top, rgba(${c},0.85) ${pct}%, #0e1b2a ${pct}%)`; ]]]"
+        "const c = pct < 20 ? '239,194,38' : '255,211,55'; "
+        "return `linear-gradient(to top, rgba(${c},0.9) ${pct}%, #FBFAF6 ${pct}%)`; ]]]"
     )
 
 
@@ -110,15 +111,15 @@ def _panel_card(name: str, eid: str, ceiling_w: int) -> dict[str, Any]:
         "styles": {
             "card": [
                 {"height": "84px"},
-                {"border": "1px solid #2a3340"},
-                {"border-radius": "10px"},
+                {"border": "1px solid #DCD8CC"},
+                {"border-radius": "2px"},
                 {"padding": "8px 6px 6px"},
                 {"background": _panel_bg(ceiling_w)},
-                {"box-shadow": "inset 0 1px 0 rgba(255,255,255,0.06)"},
+                {"box-shadow": "none"},
             ],
-            "icon": [{"width": "24px"}, {"color": "rgba(255,255,255,0.92)"}],
-            "name": [{"font-size": "11px"}, {"color": "#e6e9ef"}, {"margin-top": "2px"}],
-            "state": [{"font-size": "16px"}, {"font-weight": "600"}, {"color": "#ffffff"}],
+            "icon": [{"width": "24px"}, {"color": "rgba(22,21,16,0.85)"}],
+            "name": [{"font-size": "11px"}, {"color": "#5C594E"}, {"margin-top": "2px"}],
+            "state": [{"font-size": "16px"}, {"font-weight": "600"}, {"color": "#161510"}],
         },
     }
 

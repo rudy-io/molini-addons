@@ -24,11 +24,11 @@ sections:
             max: __PROD_MAX__
             segments:
               - from: 0
-                color: "#5f5e5a"
+                color: "#DCD8CC"
               - from: __PROD_SEG1__
-                color: "#ba7517"
+                color: "#EFC226"
               - from: __PROD_SEG2__
-                color: "#1d9e75"
+                color: "#FFD337"
 
           # Conso totale de la maison (production + réseau) SI la pince est là,
           # sinon on retombe sur la jauge réseau soutiré (une seule des deux
@@ -47,11 +47,11 @@ sections:
               max: __PROD_MAX__
               segments:
                 - from: 0
-                  color: "#1d9e75"
+                  color: "#B9B4A4"
                 - from: __PROD_SEG1__
-                  color: "#ba7517"
+                  color: "#EFC226"
                 - from: __PROD_SEG2__
-                  color: "#e24b4a"
+                  color: "#B3391F"
           - type: conditional
             conditions:
               - condition: state
@@ -66,11 +66,11 @@ sections:
               max: 9000
               segments:
                 - from: 0
-                  color: "#1d9e75"
+                  color: "#B9B4A4"
                 - from: 3000
-                  color: "#ba7517"
+                  color: "#EFC226"
                 - from: 6000
-                  color: "#e24b4a"
+                  color: "#B3391F"
 
       # Bandeau autoconsommation — n'apparaît que si la pince est là.
       - type: conditional
@@ -87,7 +87,7 @@ sections:
               entity: sensor.molini_autoconsommation
               name: Autoconsommée
               icon: mdi:home-lightning-bolt
-              color: green
+              color: amber
             - type: tile
               entity: sensor.molini_taux_autoconsommation
               name: Taux autoconso
@@ -97,7 +97,7 @@ sections:
               entity: sensor.molini_couverture_solaire
               name: Couverture solaire
               icon: mdi:leaf
-              color: green
+              color: amber
 
       - type: grid
         columns: 2
@@ -112,7 +112,7 @@ sections:
             entity: sensor.molini_reseau_injecte
             name: Injecté (surplus)
             icon: mdi:transmission-tower-import
-            color: green
+            color: amber
 
       - type: markdown
         content: >
@@ -149,13 +149,19 @@ sections:
                   entity: switch.molini_chauffe_eau
                   name: Chauffe-eau
                   icon: mdi:water-boiler
-                  color: orange
+                  color: amber
                   tap_action:
                     action: toggle
-                - type: tile
-                  entity: sensor.molini_chauffe_eau_puissance
-                  name: Puissance
-                  icon: mdi:flash
+                - type: conditional
+                  conditions:
+                    - condition: state
+                      entity: sensor.molini_chauffe_eau_puissance
+                      state_not: unavailable
+                  card:
+                    type: tile
+                    entity: sensor.molini_chauffe_eau_puissance
+                    name: Puissance
+                    icon: mdi:flash
             - type: markdown
               content: >
                 💡 Bouton manuel marche/arrêt du chauffe-eau. Le pilotage
@@ -184,15 +190,15 @@ sections:
           - entity: sensor.molini_solaire_production
             name: Production
             type: area
-            color: "#1d9e75"
+            color: "#FFD337"
           - entity: sensor.molini_consommation_maison
             name: Consommation
             type: line
-            color: "#ba7517"
+            color: "#161510"
           - entity: sensor.molini_reseau_soutire
             name: Soutiré (EDF)
             type: line
-            color: "#e24b4a"
+            color: "#B3391F"
 
   - type: grid
     cards:

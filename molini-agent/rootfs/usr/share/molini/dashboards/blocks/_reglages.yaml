@@ -26,10 +26,10 @@ cards:
       card:
         - height: 64px
         - border-radius: 12px
-        - border: 1px solid '#2a3340'
+        - border: 1px solid '#DCD8CC'
       name:
         - font-size: 14px
-        - color: '#e6e9ef'
+        - color: '#161510'
       icon:
         - width: 26px
-        - color: '#1d9e75'
+        - color: '#8A6A14'

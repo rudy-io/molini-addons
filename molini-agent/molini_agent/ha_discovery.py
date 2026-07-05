@@ -198,8 +198,11 @@ def _shelly_output_power_eid(switch_eid: str) -> Optional[str]:
     return None
 
 
-async def discover_entities(ha: HAClient) -> dict[str, Union[str, list[str]]]:
-    states = await ha.states()
+async def discover_entities(
+    ha: HAClient, states: list[dict[str, Any]] | None = None
+) -> dict[str, Union[str, list[str]]]:
+    if states is None:
+        states = await ha.states()
     if not states:
         log.warning("ha_discovery: /api/states vide")
         return {}
@@ -316,7 +319,14 @@ def generate_yaml(detected: dict[str, Union[str, list[str]]]) -> str:
     switch_lines: list[str] = []
     wh = detected.get("water_heater")
     if isinstance(wh, str) and wh:
-        power_eid = _shelly_output_power_eid(wh)
+        # Capteur puissance : override explicite (charge non-Shelly) sinon
+        # dérivation Shelly (_output_N → _puissance).
+        wh_power_override = detected.get("water_heater_power")
+        power_eid = (
+            wh_power_override
+            if isinstance(wh_power_override, str) and wh_power_override
+            else _shelly_output_power_eid(wh)
+        )
         if power_eid:
             # ⚠️ uid DISTINCT du switch (même plateforme `template`) : le switch
             # utilise molini_chauffe_eau, le capteur DOIT être différent sinon
@@ -378,16 +388,131 @@ async def _trigger_ha_reload(ha_url: str, ha_token: str) -> dict[str, Any]:
     return results
 
 
-async def execute_ha_provision(cfg) -> dict[str, Any]:
+# Domaine attendu de l'entité pour chaque rôle overridable. Un override qui ne
+# matche pas est ignoré (reporté dans `overrides_ignored`), jamais appliqué.
+_ROLE_DOMAIN: dict[str, str] = {
+    "linky_power": "sensor",
+    "linky_soutire_total": "sensor",
+    "linky_hc": "sensor",
+    "linky_hp": "sensor",
+    "tempo_today": "sensor",
+    "tempo_tomorrow": "sensor",
+    "solar_power": "sensor",
+    "solar_energy_today": "sensor",
+    "solar_energy_total": "sensor",
+    "grid_power": "sensor",
+    "grid_import_total": "sensor",
+    "grid_export_total": "sensor",
+    "water_heater": "switch",
+    # pseudo-rôle : capteur de puissance du chauffe-eau quand il n'est pas
+    # dérivable (charge pilotée non-Shelly désignée par override).
+    "water_heater_power": "sensor",
+}
+
+
+def apply_role_overrides(
+    detected: dict[str, Union[str, list[str]]],
+    roles: Any,
+    live_entity_ids: set[str],
+) -> tuple[dict[str, Union[str, list[str]]], list[str]]:
+    """Applique les overrides explicites de rôles (systématisation multi-marques).
+
+    Un override est la réponse universelle aux marques hors patterns : l'admin
+    désigne l'entité (`{"roles": {"grid_power": "sensor.x"}}`) et l'agent la
+    câble telle quelle. Validation stricte : rôle connu + domaine attendu +
+    entité vivante — sinon l'override est IGNORÉ (reporté), jamais deviné.
+    Un override `null`/"" retire le rôle (désactivation explicite).
+    """
+    ignored: list[str] = []
+    if not isinstance(roles, dict):
+        if roles is not None:
+            ignored.append("roles:not_a_mapping")
+        return detected, ignored
+
+    out = dict(detected)
+    for role, eid in roles.items():
+        dom = _ROLE_DOMAIN.get(str(role))
+        if dom is None:
+            ignored.append(f"{role}:unknown_role")
+            continue
+        if eid in (None, ""):
+            out.pop(str(role), None)
+            continue
+        if not isinstance(eid, str) or not eid.startswith(dom + "."):
+            ignored.append(f"{role}:bad_domain(expected {dom}.*)")
+            continue
+        if eid not in live_entity_ids:
+            ignored.append(f"{role}:entity_not_found:{eid}")
+            continue
+        out[str(role)] = [eid] if role in MULTI_SUM_ROLES else eid
+    return out, ignored
+
+
+# uids des capteurs template du package statique molini_energy.yaml — pour le
+# set attendu de la réconciliation registre. Miroir du package (garde-fou
+# test_expected_uids_match_package).
+PACKAGE_TEMPLATE_UIDS: frozenset[str] = frozenset(
+    {
+        "molini_reseau_soutire",
+        "molini_reseau_injecte",
+        "molini_consommation_maison",
+        "molini_autoconsommation",
+        "molini_taux_autoconsommation",
+        "molini_couverture_solaire",
+        "molini_consommation_jour",
+    }
+)
+
+
+def expected_uids_for(detected: dict[str, Union[str, list[str]]]) -> set[str]:
+    """uids Moli attendus dans le registre = capteurs générés (discovered) +
+    capteurs du package statique + switch chauffe-eau le cas échéant."""
+    role_uids = {
+        "linky_power": "molini_puissance_soutiree",
+        "linky_soutire_total": "molini_soutire_total",
+        "linky_hc": "molini_index_hc",
+        "linky_hp": "molini_index_hp",
+        "tempo_today": "molini_tempo_today",
+        "tempo_tomorrow": "molini_tempo_tomorrow",
+        "solar_power": "molini_solaire_production",
+        "solar_energy_today": "molini_solaire_production_aujourd_hui",
+        "solar_energy_total": "molini_solaire_production_totale",
+        "grid_power": "molini_reseau",
+        "grid_import_total": "molini_reseau_soutire_total",
+        "grid_export_total": "molini_reseau_injecte_total",
+    }
+    uids = set(PACKAGE_TEMPLATE_UIDS)
+    for role in detected:
+        if role in role_uids:
+            uids.add(role_uids[role])
+    wh = detected.get("water_heater")
+    if isinstance(wh, str) and wh:
+        uids.add("molini_chauffe_eau")  # switch template
+        # Le capteur puissance n'existe que s'il est dérivable (sortie Shelly)
+        # ou explicitement fourni (override water_heater_power).
+        if detected.get("water_heater_power") or _shelly_output_power_eid(wh):
+            uids.add("molini_chauffe_eau_puissance")
+    return uids
+
+
+async def execute_ha_provision(cfg, payload: dict[str, Any] | None = None) -> dict[str, Any]:
     ha = HAClient(cfg.ha_url, cfg.ha_token)
     try:
-        detected = await discover_entities(ha)
+        states = await ha.states()
+        detected = await discover_entities(ha, states=states)
+        # Overrides explicites (multi-marques) — priment sur les patterns.
+        overrides_ignored: list[str] = []
+        roles = (payload or {}).get("roles")
+        if roles is not None:
+            live = {s.get("entity_id", "") for s in (states or [])}
+            detected, overrides_ignored = apply_role_overrides(detected, roles, live)
         if not detected:
             return {
                 "ok": True,
                 "detected": {},
                 "written": False,
                 "reason": "no_entities_matched",
+                "overrides_ignored": overrides_ignored,
             }
 
         yaml_content = generate_yaml(detected)
@@ -413,12 +538,42 @@ async def execute_ha_provision(cfg) -> dict[str, Any]:
 
         reload_result = await _trigger_ha_reload(cfg.ha_url, cfg.ha_token)
 
-        return {
+        # Self-heal registre (post-mortem 0.18.x) : renomme les entités Moli
+        # vers leur entity_id canonique, purge les uids legacy, réactive les
+        # entrées disabled héritées. Best-effort — un échec WS ne fait jamais
+        # échouer la provision.
+        reconcile: dict[str, Any]
+        try:
+            import asyncio
+            from .registry_reconcile import apply_reconcile, ws_url_from_ha_url
+            # Timeout global 60 s : un WS qui pend ne doit JAMAIS geler la
+            # boucle agent (heartbeat + commandes sont séquentiels).
+            reconcile = await asyncio.wait_for(
+                apply_reconcile(
+                    ws_url_from_ha_url(cfg.ha_url),
+                    cfg.ha_token,
+                    expected_uids_for(detected),
+                ),
+                timeout=60,
+            )
+        except Exception as e:  # noqa: BLE001
+            log.warning("registry_reconcile failed (non-bloquant): %s", e)
+            reconcile = {"error": str(e)}
+
+        result = {
             "ok": True,
             "detected": detected,
             "written": True,
             "path": target_path,
             "reload": reload_result,
+            "reconcile": reconcile,
         }
+        if overrides_ignored:
+            result["overrides_ignored"] = overrides_ignored
+        if reconcile.get("restart_pending"):
+            # Des entités disabled→enabled ne s'instancient qu'au restart —
+            # séquencé par le central (wizard/onboarding), jamais auto ici.
+            result["ha_restart_pending"] = True
+        return result
     finally:
         await ha.close()
