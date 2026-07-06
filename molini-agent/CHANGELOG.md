@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.22.0
+
+**🗣️ Panneau « Moli » central + chat qui AGIT (borné niveau ≤ 2).**
+
+- **Nouvelle vue « Assistant »** forcée en tête du dashboard Moli (vue par
+  défaut = « le truc principal ») : carte chat plein écran `moli-chat-card.js`
+  (charte Le Relevé), servie via `frontend.extra_module_url`.
+- **Vues proxy internes** (`custom_components/moli_ai/http.py`) :
+  `/api/moli_ai/{converse,action/{id},actions}`, protégées par l'auth de
+  session HA — l'`agent_token` reste côté serveur, jamais dans le navigateur.
+- Le chat peut désormais **agir** (renommer un indicateur, ouvrir le pairing
+  Zigbee, configurer un appareil détecté, nettoyer des indicateurs morts) via
+  le couloir borné du central (registre de skills + validateur, mur niveau 3,
+  confirmations dans le chat pour le niveau 2, annulation 30 j).
+- `dashboard_builder` : bloc `assistant` ajouté à la white-list, forcé en tête.
+
 ## 0.21.1
 
 **🎨 Courbe 24 h lisible** (retour terrain) : la pince 3EM pousse un point

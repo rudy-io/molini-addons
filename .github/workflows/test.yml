@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install deps
-        run: pip install httpx "ruamel.yaml" psutil pytest pytest-asyncio
+        run: pip install httpx "ruamel.yaml" psutil jinja2 pytest pytest-asyncio
       - name: py_compile (agent + custom component)
         run: |
           python -m py_compile molini_agent/*.py

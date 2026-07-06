@@ -1,9 +1,9 @@
 {
   "domain": "moli_ai",
   "name": "Moli AI",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "documentation": "https://moli.energy",
-  "dependencies": ["conversation"],
+  "dependencies": ["conversation", "http"],
   "codeowners": ["@rudy-io"],
   "requirements": [],
   "iot_class": "cloud_polling",

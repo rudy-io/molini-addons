@@ -123,10 +123,14 @@ def test_build_yaml_returns_valid_yaml():
 
 
 def test_build_yaml_full_set():
-    """Avec tous les blocs activés, l'ordre est forcé et le YAML est valide."""
+    """Avec tous les blocs activés, l'ordre est forcé et le YAML est valide.
+
+    ``assistant`` (le chat) est forcé tout en tête (vue par défaut), suivi de
+    ``_header`` ; ``_reglages`` reste dernier."""
     all_blocks = list(SHIPPED_BLOCKS)
     result = build_yaml(all_blocks, blocks_dir=BLOCKS_DIR)
-    assert result.blocks_used[0] == "_header"
+    assert result.blocks_used[0] == "assistant"
+    assert result.blocks_used[1] == "_header"
     assert result.blocks_used[-1] == "_reglages"
     assert len(result.blocks_used) == len(SHIPPED_BLOCKS)
 
