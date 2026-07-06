@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.20.1
+
+**🐛 Une provision nocturne ne perd plus les onduleurs endormis** (post-mortem
+2026-07-06, box pilote) : les rôles solaires SOMMÉS matchaient uniquement des
+entités « vivantes » — or les onduleurs sont `unavailable` la nuit → une
+`ha_provision` nocturne les retirait du référentiel et la production affichée
+était divisée jusqu'à la provision de jour suivante (confondu un temps avec un
+double comptage — réfuté par l'injection 3EM soutenue > prod d'un seul champ).
+Fix : `require_live=False` pour les rôles multi-somme (le template neutralise
+les endormis via `float(0)` + availability en OR). Les rôles simples gardent
+l'exigence « vivant ». +1 test.
+
+
 ## 0.20.0
 
 **🤖 Pilotage automatique du chauffe-eau** (package `molini_pilotage`, 100 %

@@ -143,16 +143,26 @@ def _find_entity(
 
 
 def _find_all_entities(
-    states: list[dict[str, Any]], patterns: list[str]
+    states: list[dict[str, Any]], patterns: list[str], require_live: bool = True
 ) -> list[str]:
-    """Toutes les entités vivantes matchant un pattern (dédupliquées, ordre stable)."""
+    """Toutes les entités matchant un pattern (dédupliquées, ordre stable).
+
+    ``require_live=False`` pour les rôles SOMMÉS (production solaire) : les
+    onduleurs DORMENT la nuit (unavailable) — une provision nocturne ne doit
+    pas les faire disparaître du référentiel (post-mortem 2026-07-06 : la
+    provision de 23h11 avait perdu les 2 SolarMan → prod divisée par 2 le
+    lendemain). Le template les neutralise proprement (`float(0)` +
+    availability en OR), donc inclure une entité endormie est sans risque.
+    """
     found: list[str] = []
     seen: set[str] = set()
     for pat in patterns:
         rx = re.compile(pat, re.IGNORECASE)
         for s in states:
             eid = s.get("entity_id", "")
-            if eid in seen or not _is_live(s.get("state")):
+            if eid in seen:
+                continue
+            if require_live and not _is_live(s.get("state")):
                 continue
             if rx.match(eid):
                 seen.add(eid)
@@ -216,7 +226,7 @@ async def discover_entities(
     found: dict[str, Union[str, list[str]]] = {}
     for role, patterns in PATTERNS.items():
         if role in MULTI_SUM_ROLES:
-            eids = _find_all_entities(states, patterns)
+            eids = _find_all_entities(states, patterns, require_live=False)
             if eids:
                 found[role] = eids
                 log.info("ha_discovery: %s → %s (somme de %d)", role, ", ".join(eids), len(eids))

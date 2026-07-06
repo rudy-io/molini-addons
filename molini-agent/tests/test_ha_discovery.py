@@ -366,3 +366,26 @@ def test_no_duplicate_unique_ids_discovered_and_package():
     ids = _all_unique_ids(disc) + _all_unique_ids(pkg)
     dups = {u for u in ids if ids.count(u) > 1}
     assert not dups, f"unique_id dupliqués (collision registre HA) : {dups}"
+
+
+@pytest.mark.asyncio
+async def test_multi_sum_keeps_sleeping_inverters():
+    """Post-mortem 2026-07-06 : une provision NOCTURNE ne doit pas perdre les
+    onduleurs endormis (unavailable) sur les rôles sommés — sinon la prod du
+    référentiel est divisée jusqu'à la provision de jour suivante."""
+    from molini_agent.ha_client import HAClient
+    fake_states = [
+        _state("sensor.inverter_pv_power", "unavailable"),
+        _state("sensor.inverter_2_pv_power", "unavailable"),
+        _state("sensor.izypower_x_puissance_pv", "0"),
+        _state("sensor.lixee_zlinky_tic_puissance", "300"),
+    ]
+    ha = HAClient("http://supervisor/core", "fake_token")
+    with patch.object(ha, "states", new=AsyncMock(return_value=fake_states)):
+        detected = await discover_entities(ha)
+    assert set(detected["solar_power"]) == {
+        "sensor.inverter_pv_power", "sensor.inverter_2_pv_power",
+        "sensor.izypower_x_puissance_pv",
+    }
+    # les rôles NON sommés gardent l'exigence « vivant »
+    assert detected.get("linky_power") == "sensor.lixee_zlinky_tic_puissance"
