@@ -50,6 +50,12 @@ PATTERNS: dict[str, list[str]] = {
         r"^sensor\.(?:lixee_)?zlinky[\w_]*consommation_partie_2$",
         r"^sensor\.(?:linky|zlinky)[\w_]*easf02$",
     ],
+    # Période tarifaire en cours (PTEC : « HC.. », « HP.. », « HCJB »…) —
+    # base de la détection heures creuses SANS config (repli : fenêtre horaire).
+    "linky_ptec": [
+        r"^sensor\.(?:lixee_)?zlinky[\w_]*_?ptec$",
+        r"^sensor\.(?:linky|zlinky)[\w_]*periode_tarifaire[\w_]*$",
+    ],
     "tempo_today": [
         r"^sensor\.rte_tempo_couleur_(?:actuelle|du_jour)$",
         r"^sensor\.tempo_today$",
@@ -239,6 +245,7 @@ def generate_yaml(detected: dict[str, Union[str, list[str]]]) -> str:
         "linky_soutire_total": ("MOLINI Soutiré total", "molini_soutire_total", "kWh", "energy", "total_increasing"),
         "linky_hc": ("MOLINI Index HC", "molini_index_hc", "kWh", "energy", "total_increasing"),
         "linky_hp": ("MOLINI Index HP", "molini_index_hp", "kWh", "energy", "total_increasing"),
+        "linky_ptec": ("MOLINI Période tarifaire", "molini_ptec", None, None, None),
         "tempo_today": ("MOLINI Tempo aujourd'hui", "molini_tempo_today", None, None, None),
         "tempo_tomorrow": ("MOLINI Tempo demain", "molini_tempo_tomorrow", None, None, None),
         # Nommage FR canonique — aligné sur le dashboard, capacities.py,
@@ -395,6 +402,7 @@ _ROLE_DOMAIN: dict[str, str] = {
     "linky_soutire_total": "sensor",
     "linky_hc": "sensor",
     "linky_hp": "sensor",
+    "linky_ptec": "sensor",
     "tempo_today": "sensor",
     "tempo_tomorrow": "sensor",
     "solar_power": "sensor",
@@ -463,6 +471,15 @@ PACKAGE_TEMPLATE_UIDS: frozenset[str] = frozenset(
     }
 )
 
+# uids des binary_sensors template du package molini_pilotage.yaml (pilotage
+# chauffe-eau). Miroir gardé par test_expected_uids_match_pilotage_package.
+PILOTAGE_TEMPLATE_UIDS: frozenset[str] = frozenset(
+    {
+        "molini_heures_creuses",
+        "molini_surplus_solaire",
+    }
+)
+
 
 def expected_uids_for(detected: dict[str, Union[str, list[str]]]) -> set[str]:
     """uids Moli attendus dans le registre = capteurs générés (discovered) +
@@ -480,8 +497,9 @@ def expected_uids_for(detected: dict[str, Union[str, list[str]]]) -> set[str]:
         "grid_power": "molini_reseau",
         "grid_import_total": "molini_reseau_soutire_total",
         "grid_export_total": "molini_reseau_injecte_total",
+        "linky_ptec": "molini_ptec",
     }
-    uids = set(PACKAGE_TEMPLATE_UIDS)
+    uids = set(PACKAGE_TEMPLATE_UIDS) | set(PILOTAGE_TEMPLATE_UIDS)
     for role in detected:
         if role in role_uids:
             uids.add(role_uids[role])

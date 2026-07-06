@@ -218,6 +218,7 @@ def check_missing_entities(
         and not eid.startswith("scene.molini_")
         and not eid.startswith("sensor.molini_")
         and not eid.startswith("switch.molini_")
+        and not eid.startswith("binary_sensor.molini_")
     )
 
 

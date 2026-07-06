@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.20.0
+
+**🤖 Pilotage automatique du chauffe-eau** (package `molini_pilotage`, 100 %
+local — automations HA natives, fonctionne box hors-ligne) :
+
+- **4 modes** (`input_select.molini_chauffe_eau_mode`) : **Toujours allumé**
+  (défaut — relais fermé, comportement contacteur, zéro changement au rollout),
+  **Auto (solaire + heures creuses)** — chauffe sur SURPLUS solaire (injection
+  > seuil, confirmation 5 min, coupure après 10 min de soutirage, anti-court-
+  cycle 15 min, jamais de coupure pendant la fenêtre HC) + GARANTIE heures
+  creuses (eau chaude le matin quoi qu'il arrive), **Heures creuses** (fenêtre
+  seule), **Arrêt** (vacances).
+- **Heures creuses** : détectées via la période tarifaire Linky (nouveau rôle
+  `linky_ptec` → `sensor.molini_ptec`, universel zéro-config) avec REPLI sur
+  fenêtre `input_datetime` configurable depuis le dashboard (défaut 23:00→07:00).
+- **Seuils réglables** au dashboard : enclenchement surplus (≈ puissance du
+  ballon) + coupure soutirage.
+- **Sûreté** : seule cible = l'alias `switch.molini_chauffe_eau` (posé par la
+  discovery validée) ; garde « switch dispo » partout (box sans chauffe-eau =
+  automations inertes) ; le mode s'applique au démarrage de HA (état relais
+  déterministe — « Toujours allumé » restaure l'alimentation permanente).
+- Dashboard énergie : sélecteur de mode + badges HC/surplus + réglages.
+- Tests : +18 (structure, sûreté « ne pilote QUE molini_chauffe_eau », logique
+  Jinja HC rendue réellement — PTEC prioritaire, fenêtre passage minuit —,
+  seuils surplus). Suite 226.
+
+
 ## 0.19.0
 
 **🏭 Systématisation de la brique énergie (multi-marques) + charte Le Relevé.**

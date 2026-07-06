@@ -126,7 +126,7 @@ sections:
           soit ~**{{ (states('sensor.molini_soutire_jour') | float(0) * __PRIX_KWH__) | round(2) }} €**
           payés à EDF *(tarif __PRIX_KWH_FR__ €/kWh)*.
 
-  # ── Chauffe-eau : pilotage manuel (tant que les automatisations ne sont pas faites)
+  # ── Chauffe-eau : pilotage (manuel + automatique via molini_pilotage) ────
   - type: grid
     cards:
       - type: conditional
@@ -162,10 +162,51 @@ sections:
                     entity: sensor.molini_chauffe_eau_puissance
                     name: Puissance
                     icon: mdi:flash
+
+            # Mode de pilotage (Toujours / Auto solaire+HC / HC / Arrêt)
+            - type: tile
+              entity: input_select.molini_chauffe_eau_mode
+              name: Mode de pilotage
+              icon: mdi:water-boiler-auto
+              color: amber
+              features:
+                - type: select-options
+
+            - type: grid
+              columns: 2
+              square: false
+              cards:
+                - type: tile
+                  entity: binary_sensor.molini_heures_creuses
+                  name: Heures creuses
+                  icon: mdi:clock-time-eleven-outline
+                - type: tile
+                  entity: binary_sensor.molini_surplus_solaire
+                  name: Surplus solaire
+                  icon: mdi:white-balance-sunny
+                  color: yellow
+
+            - type: entities
+              title: Réglages du pilotage
+              state_color: false
+              entities:
+                - entity: input_number.molini_ce_seuil_surplus
+                  name: Seuil surplus (enclenchement)
+                - entity: input_number.molini_ce_seuil_arret
+                  name: Seuil soutirage (coupure)
+                - entity: input_datetime.molini_hc_debut
+                  name: Heures creuses — début
+                - entity: input_datetime.molini_hc_fin
+                  name: Heures creuses — fin
+
             - type: markdown
               content: >
-                💡 Bouton manuel marche/arrêt du chauffe-eau. Le pilotage
-                automatique (heures creuses / surplus solaire) sera ajouté ensuite.
+                🤖 **Auto** : chauffe sur surplus solaire + garantie heures
+                creuses (eau chaude le matin). **Heures creuses** : fenêtre HC
+                seule. **Toujours allumé** : relais fermé (le thermostat du
+                ballon gère). **Arrêt** : vacances.
+                En mode Auto, le bouton manuel est repris en main par le
+                pilotage au point de contrôle suivant.
 
   - type: grid
     cards:
