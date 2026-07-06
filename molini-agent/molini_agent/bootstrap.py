@@ -113,6 +113,7 @@ MOLI_HA_CONFIG_PATCH: dict[str, Any] = {
             "/local/moli-cards/apexcharts-card.js",
             "/local/moli-cards/kiosk-mode.js",
             "/local/moli-cards/moli-brand.js",
+            "/local/moli-cards/moli-chat-card.js",
         ],
         # Thème Moli — charte « Le Relevé » (moli.energy) : fond os, encre,
         # accent jaune doré, cuivre pour l'interactif, angles vifs (2px),

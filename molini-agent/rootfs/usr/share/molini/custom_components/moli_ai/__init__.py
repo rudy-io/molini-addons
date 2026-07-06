@@ -45,7 +45,12 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = dict(entry.data)
+    cfg = dict(entry.data)
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = cfg
+    # Vues proxy pour le panneau chat (token gardé côté serveur, cf. http.py).
+    from .http import register_views
+
+    register_views(hass, cfg.get("central_url", ""), cfg.get("token", ""))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 

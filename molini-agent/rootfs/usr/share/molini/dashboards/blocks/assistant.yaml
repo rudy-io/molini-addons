@@ -1,0 +1,10 @@
+# Bloc « Assistant » — vue chat Moli AI, forcée en TÊTE du dashboard (vue par
+# défaut). L'occupant y parle à Moli et peut agir (niveau ≤ 2, confirmations
+# dans le chat). La carte est servie par l'add-on (/local/moli-cards/) et
+# chargée via frontend.extra_module_url.
+title: Assistant
+path: assistant
+icon: mdi:message-processing-outline
+type: panel
+cards:
+  - type: custom:moli-chat-card

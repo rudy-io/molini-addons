@@ -54,6 +54,7 @@ def prod_gauge_scale(observed_max_w: float) -> tuple[int, int, int]:
 # le dossier pour éviter qu'un attaquant qui poserait un fichier supplémentaire
 # puisse le faire référencer.
 ALLOWED_BLOCKS: tuple[str, ...] = (
+    "assistant",
     "_header",
     "energie",
     "chauffage",
@@ -65,9 +66,10 @@ ALLOWED_BLOCKS: tuple[str, ...] = (
     "_reglages",
 )
 
-# Blocs avec position figée — l'ordre transmis par l'admin est respecté
-# pour les autres, mais ces deux-là sont sortis et replacés.
-FORCED_FIRST = "_header"
+# Blocs à position figée. ``assistant`` (le chat) est forcé tout en tête pour
+# être la vue par défaut du dashboard — c'est « le truc principal ». Vient
+# ensuite ``_header``. ``_reglages`` est toujours dernier.
+FORCED_HEAD: tuple[str, ...] = ("assistant", "_header")
 FORCED_LAST = "_reglages"
 
 # Defaults appliqués si la liste de blocs est vide ou si la colonne DB
@@ -79,6 +81,7 @@ FORCED_LAST = "_reglages"
 # chauffage/ve/confort/securite/multimedia restent dans ALLOWED_BLOCKS pour le
 # futur, mais n'entrent ici qu'une fois leur fichier embarqué.
 DEFAULT_BLOCKS: tuple[str, ...] = (
+    "assistant",
     "_header",
     "energie",
     "aide",
@@ -256,11 +259,10 @@ def validate_blocks(blocks: Iterable[str]) -> list[str]:
     if not ordered:
         raise ValueError("blocks list is empty — at least one block required")
 
-    # Force position de _header et _reglages
-    body = [s for s in ordered if s not in (FORCED_FIRST, FORCED_LAST)]
-    final = []
-    if FORCED_FIRST in ordered:
-        final.append(FORCED_FIRST)
+    # Force position : FORCED_HEAD (assistant puis _header) en tête, _reglages
+    # en dernier, le reste dans l'ordre demandé.
+    body = [s for s in ordered if s not in FORCED_HEAD and s != FORCED_LAST]
+    final = [s for s in FORCED_HEAD if s in ordered]
     final.extend(body)
     if FORCED_LAST in ordered:
         final.append(FORCED_LAST)
