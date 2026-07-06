@@ -85,6 +85,7 @@ PATTERNS: dict[str, list[str]] = {
     ],
     "solar_energy_total": [
         r"^sensor\.inverter(?:_\d+)?_total_production$",
+        r"^sensor\.izypower[\w_]*_production_total$",
         r"^sensor\.envoy[\w_]*lifetime[\w_]*production[\w_]*$",
         r"^sensor\.huawei_solar[\w_]*total_yield$",
         r"^sensor\.solaredge[\w_]*lifetime_energy$",
