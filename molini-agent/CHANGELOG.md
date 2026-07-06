@@ -22,9 +22,16 @@ local — automations HA natives, fonctionne box hors-ligne) :
   automations inertes) ; le mode s'applique au démarrage de HA (état relais
   déterministe — « Toujours allumé » restaure l'alimentation permanente).
 - Dashboard énergie : sélecteur de mode + badges HC/surplus + réglages.
-- Tests : +18 (structure, sûreté « ne pilote QUE molini_chauffe_eau », logique
-  Jinja HC rendue réellement — PTEC prioritaire, fenêtre passage minuit —,
-  seuils surplus). Suite 226.
+- **Correctifs revue adversariale** (avant tout deploy) : fenêtre HC de repli
+  **jamais morte** (helpers créés à 00:00:00 ⇒ défaut réel 23:00→07:00 codé) ;
+  coupure **réévaluable** (binaire `molini_soutirage_reseau` + time_pattern
+  /5 min — un front raté par l'anti-cycle est rattrapé, plus de relais bloqué
+  ON sur réseau) ; contrat **Base** (PTEC « TH.. ») ⇒ la fenêtre sert de
+  garantie (pas d'eau froide les semaines sans soleil) ; `linky_ptec` et
+  `tempo_*` réalignés slug(name)==uid ; seuil surplus min 1 500 W.
+- Tests : +22 (structure, sûreté « ne pilote QUE molini_chauffe_eau », logique
+  Jinja HC rendue réellement — PTEC prioritaire/HP/Base, fenêtre passage
+  minuit, fenêtre non configurée —, seuils). Suite 230.
 
 
 ## 0.19.0

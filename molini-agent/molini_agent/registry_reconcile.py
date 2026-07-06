@@ -52,6 +52,8 @@ LEGACY_UIDS: frozenset[str] = frozenset(
         "molini_chauffe_eau_w",
         "molini_taux_autoconso",
         "molini_puissance_totale",  # rôle linky_net_power retiré en 0.15.0
+        "molini_tempo_today",       # renommés slug==uid en 0.20.0
+        "molini_tempo_tomorrow",
     }
 )
 

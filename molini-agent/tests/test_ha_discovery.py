@@ -292,9 +292,19 @@ def _iter_named_entities(doc):
 
 def test_generated_discovered_slug_matches_unique_id():
     """Tout capteur/switch de molini_discovered.yaml : slug(name) == unique_id."""
+    # ⚠️ fixture EXHAUSTIVE : tous les rôles émis — un rôle absent d'ici
+    # échappe au garde-fou (leçon 0.20.0 : linky_ptec/tempo avaient dérivé).
     detected = {
         "linky_power": "sensor.zlinky_puissance",
+        "linky_soutire_total": "sensor.zlinky_consommation",
+        "linky_hc": "sensor.zlinky_hchc",
+        "linky_hp": "sensor.zlinky_hchp",
+        "linky_ptec": "sensor.zlinky_ptec",
+        "tempo_today": "sensor.rte_tempo_couleur_actuelle",
+        "tempo_tomorrow": "sensor.rte_tempo_prochaine_couleur",
         "solar_power": ["sensor.inverter_pv_power"],
+        "solar_energy_today": ["sensor.inverter_today_production"],
+        "solar_energy_total": ["sensor.inverter_total_production"],
         "grid_power": "sensor.shellypro3em_x_puissance",
         "grid_import_total": "sensor.shellypro3em_x_energie",
         "grid_export_total": "sensor.shellypro3em_x_energie_restituee",
@@ -303,6 +313,7 @@ def test_generated_discovered_slug_matches_unique_id():
     doc = _YAML(typ="safe").load(generate_yaml(detected))
     pairs = list(_iter_named_entities(doc))
     assert pairs, "aucune entité générée"
+    assert len(pairs) >= 15, f"fixture incomplète ? {len(pairs)} entités"
     for name, uid in pairs:
         assert _ha_slugify(name) == uid, (
             f"slug({name!r})={_ha_slugify(name)!r} != unique_id {uid!r} "

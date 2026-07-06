@@ -245,9 +245,11 @@ def generate_yaml(detected: dict[str, Union[str, list[str]]]) -> str:
         "linky_soutire_total": ("MOLINI Soutiré total", "molini_soutire_total", "kWh", "energy", "total_increasing"),
         "linky_hc": ("MOLINI Index HC", "molini_index_hc", "kWh", "energy", "total_increasing"),
         "linky_hp": ("MOLINI Index HP", "molini_index_hp", "kWh", "energy", "total_increasing"),
-        "linky_ptec": ("MOLINI Période tarifaire", "molini_ptec", None, None, None),
-        "tempo_today": ("MOLINI Tempo aujourd'hui", "molini_tempo_today", None, None, None),
-        "tempo_tomorrow": ("MOLINI Tempo demain", "molini_tempo_tomorrow", None, None, None),
+        # ⚠️ slug(name) == unique_id (post-mortem 0.18.x) — « MOLINI PTEC »
+        # → sensor.molini_ptec directement, sans dépendre du reconcile.
+        "linky_ptec": ("MOLINI PTEC", "molini_ptec", None, None, None),
+        "tempo_today": ("MOLINI Tempo aujourd'hui", "molini_tempo_aujourd_hui", None, None, None),
+        "tempo_tomorrow": ("MOLINI Tempo demain", "molini_tempo_demain", None, None, None),
         # Nommage FR canonique — aligné sur le dashboard, capacities.py,
         # commands.py, le panel JS et le rapport central. (Consolidation des
         # sources de vérité éclatées : plus de molini_solar_power_w.)
@@ -477,6 +479,7 @@ PILOTAGE_TEMPLATE_UIDS: frozenset[str] = frozenset(
     {
         "molini_heures_creuses",
         "molini_surplus_solaire",
+        "molini_soutirage_reseau",
     }
 )
 
@@ -489,8 +492,8 @@ def expected_uids_for(detected: dict[str, Union[str, list[str]]]) -> set[str]:
         "linky_soutire_total": "molini_soutire_total",
         "linky_hc": "molini_index_hc",
         "linky_hp": "molini_index_hp",
-        "tempo_today": "molini_tempo_today",
-        "tempo_tomorrow": "molini_tempo_tomorrow",
+        "tempo_today": "molini_tempo_aujourd_hui",
+        "tempo_tomorrow": "molini_tempo_demain",
         "solar_power": "molini_solaire_production",
         "solar_energy_today": "molini_solaire_production_aujourd_hui",
         "solar_energy_total": "molini_solaire_production_totale",

@@ -38,7 +38,7 @@ input_number:
   # typique) pour que la chauffe reste couverte par le solaire.
   molini_ce_seuil_surplus:
     name: "MOLINI CE seuil surplus"
-    min: 500
+    min: 1500
     max: 6000
     step: 100
     unit_of_measurement: "W"
@@ -75,14 +75,24 @@ template:
         icon: mdi:clock-time-eleven-outline
         state: >
           {% set ptec = states('sensor.molini_ptec') | upper %}
-          {% if ptec not in ['UNKNOWN', 'UNAVAILABLE', 'NONE', ''] %}
-          {{ ptec.startswith('HC') }}
+          {% if ptec.startswith('HC') %}
+          true
+          {% elif ptec.startswith('HP') %}
+          false
           {% else %}
+          {# PTEC absente, indisponible, ou contrat Base (TH..) → fenêtre.
+             En Base la nuit coûte pareil : la fenêtre sert de GARANTIE. #}
           {% set n = now().hour * 60 + now().minute %}
           {% set d = states('input_datetime.molini_hc_debut') %}
           {% set f = states('input_datetime.molini_hc_fin') %}
           {% set deb = (d[0:2] | int(23)) * 60 + (d[3:5] | int(0)) %}
           {% set fin = (f[0:2] | int(7)) * 60 + (f[3:5] | int(0)) %}
+          {% if deb == fin %}
+          {# fenêtre non configurée (helpers créés à 00:00:00) → défaut réel
+             23:00→07:00 — la garantie eau chaude ne peut pas être « morte ». #}
+          {% set deb = 23 * 60 %}
+          {% set fin = 7 * 60 %}
+          {% endif %}
           {% if deb <= fin %}
           {{ deb <= n and n < fin }}
           {% else %}
@@ -99,6 +109,15 @@ template:
         state: >
           {{ (states('sensor.molini_reseau') | float(0))
              <= -(states('input_number.molini_ce_seuil_surplus') | float(2200)) }}
+
+      # ── Soutirage réseau significatif ? (base de la COUPURE en Auto) ────
+      - name: "MOLINI Soutirage réseau"
+        unique_id: molini_soutirage_reseau
+        icon: mdi:transmission-tower-export
+        availability: "{{ states('sensor.molini_reseau') not in ['unknown','unavailable','none'] }}"
+        state: >
+          {{ (states('sensor.molini_reseau') | float(0))
+             > (states('input_number.molini_ce_seuil_arret') | float(300)) }}
 
 automation:
   # ── Garantie heures creuses : ON à l'entrée de fenêtre ──────────────────
@@ -172,17 +191,26 @@ automation:
           entity_id: switch.molini_chauffe_eau
 
   # ── Plus de solaire : OFF après 10 min de soutirage (hors fenêtre HC) ───
+  # Coupure RÉÉVALUABLE : le trigger d'état ne fire que sur un front — si les
+  # conditions échouent à ce moment-là (ex. anti-court-cycle), le time_pattern
+  # /5 min re-tente. Sans lui : relais bloqué ON sur réseau (trou de la revue
+  # 0.20.0). La condition `for:` porte l'exigence des 10 min dans les 2 cas.
   - id: molini_ce_surplus_fin
     alias: "MOLINI CE — surplus terminé : arrêt"
     mode: single
     max_exceeded: silent
     triggers:
-      - trigger: template
-        value_template: >
-          {{ (states('sensor.molini_reseau') | float(0))
-             > (states('input_number.molini_ce_seuil_arret') | float(300)) }}
+      - trigger: state
+        entity_id: binary_sensor.molini_soutirage_reseau
+        to: "on"
         for: "00:10:00"
+      - trigger: time_pattern
+        minutes: "/5"
     conditions:
+      - condition: state
+        entity_id: binary_sensor.molini_soutirage_reseau
+        state: "on"
+        for: "00:10:00"
       - condition: state
         entity_id: input_select.molini_chauffe_eau_mode
         state: "Auto (solaire + heures creuses)"
@@ -211,6 +239,7 @@ automation:
     triggers:
       - trigger: state
         entity_id: input_select.molini_chauffe_eau_mode
+        to: null
       - trigger: homeassistant
         event: start
     conditions:
