@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.21.0
+
+**📖 Bilan du jour pédagogique** sur le dashboard Énergie : les flux expliqués
+en français clair — production → autoconsommée / renvoyée au réseau ;
+consommation maison → part solaire (couverture) / part achetée (en €) ; rappel
+explicite « cumuls depuis minuit vs jauges instantanées » (la confusion
+cumul/instantané était une des 4 incohérences du post-mortem 2026-07-06).
+Complète le système de cohérence côté central (invariants C1-C4 vérifiés
+1×/h → alertes Telegram + carte « Cohérence énergie » sur la fiche client).
+
+
 ## 0.20.1
 
 **🐛 Une provision nocturne ne perd plus les onduleurs endormis** (post-mortem

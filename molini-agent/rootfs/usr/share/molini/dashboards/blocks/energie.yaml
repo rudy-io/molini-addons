@@ -114,17 +114,37 @@ sections:
             icon: mdi:transmission-tower-import
             color: amber
 
+      # ── Bilan du jour — les flux expliqués en français (anti-confusion
+      # cumul/instantané, post-mortem 2026-07-06). Toutes les valeurs = CUMULS
+      # depuis minuit ; les jauges au-dessus = instantané.
       - type: markdown
         content: >
-          ⚡ **Produit aujourd'hui :** {{ states('sensor.molini_solaire_production_aujourd_hui') }} kWh.
-          {% if states('sensor.molini_consommation_jour') not in ['unknown','unavailable'] %}
-          🏠 **Consommé :** {{ states('sensor.molini_consommation_jour') }} kWh.
+          ### Le bilan du jour (depuis minuit)
+
+          {% set prod = states('sensor.molini_solaire_production_aujourd_hui') | float(0) %}
+          {% set inj = states('sensor.molini_injecte_jour') | float(0) %}
+          {% set sout3em = states('sensor.molini_soutire_3em_jour') | float(0) %}
+          {% set soutlinky = states('sensor.molini_soutire_jour') | float(0) %}
+          {% set conso = states('sensor.molini_consommation_jour') | float(0) %}
+          {% set autoconso = [prod - inj, 0] | max %}
+          ☀️ **Vos panneaux ont produit {{ prod | round(1) }} kWh**
+          {% if prod > 0 %}
+          → **{{ autoconso | round(1) }} kWh consommés sur place**
+          ({{ (autoconso / prod * 100) | round(0) }} % de la production)
+          et **{{ inj | round(1) }} kWh renvoyés au réseau** (le surplus).
           {% endif %}
 
 
-          🔌 **Tiré du réseau aujourd'hui :** {{ states('sensor.molini_soutire_jour') }} kWh —
-          soit ~**{{ (states('sensor.molini_soutire_jour') | float(0) * __PRIX_KWH__) | round(2) }} €**
-          payés à EDF *(tarif __PRIX_KWH_FR__ €/kWh)*.
+          🏠 **La maison a consommé {{ conso | round(1) }} kWh** :
+          {{ autoconso | round(1) }} kWh venus du soleil
+          ({% if conso > 0 %}{{ (autoconso / conso * 100) | round(0) }} % de couverture{% else %}—{% endif %})
+          et **{{ sout3em | round(1) }} kWh achetés au réseau**
+          (~**{{ (sout3em * __PRIX_KWH__) | round(2) }} €** au tarif __PRIX_KWH_FR__ €/kWh).
+
+
+          *Côté compteur EDF : {{ soutlinky | round(1) }} kWh soutirés.
+          Les chiffres ci-dessus sont des cumuls depuis minuit — les jauges
+          du haut montrent l'instantané.*
 
   # ── Chauffe-eau : pilotage (manuel + automatique via molini_pilotage) ────
   - type: grid
