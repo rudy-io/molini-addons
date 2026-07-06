@@ -38,6 +38,11 @@ class _MoliProxyBase(HomeAssistantView):
                     json=payload,
                     timeout=_TIMEOUT,
                 ) as resp:
+                    if resp.status >= 400:
+                        # NE JAMAIS propager le corps d'erreur du central au
+                        # navigateur (il pourrait un jour contenir un détail
+                        # serveur/secret). Message générique fixe.
+                        return self.json({"error": "erreur_moli"}, status_code=resp.status)
                     data = await resp.json()
                     return self.json(data, status_code=resp.status)
         except Exception as e:  # noqa: BLE001 — dégrade proprement côté carte
