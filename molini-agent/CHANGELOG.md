@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.21.1
+
+**🎨 Courbe 24 h lisible** (retour terrain) : la pince 3EM pousse un point
+toutes les ~15 s → tracé brut en spaghetti. Fix : moyennes glissantes 10 min
+sur les 3 séries (`group_by: avg`), courbes adoucies (`curve: smooth`,
+traits 2 px), production en aire translucide, axe Y sans décimales
+(`decimalsInFloat: 0`, échelle auto propre), grille pointillée discrète
+charte Le Relevé.
+
+
 ## 0.21.0
 
 **📖 Bilan du jour pédagogique** sur le dashboard Énergie : les flux expliqués

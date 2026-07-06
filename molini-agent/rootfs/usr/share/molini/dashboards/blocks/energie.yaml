@@ -243,23 +243,58 @@ sections:
         heading: 24 dernières heures
         heading_style: title
 
+      # Lissage moyenne 10 min : la pince 3EM pousse un point toutes les ~15 s
+      # → tracé brut illisible (retour Rudy 06/07). Courbes adoucies, traits
+      # nets, axe sans décimales, grille discrète charte Le Relevé.
       - type: custom:apexcharts-card
         graph_span: 24h
         header:
           show: false
+        apex_config:
+          grid:
+            borderColor: "#DCD8CC"
+            strokeDashArray: 3
+          yaxis:
+            min: 0
+            forceNiceScale: true
+            decimalsInFloat: 0
+          xaxis:
+            tooltip:
+              enabled: false
+          tooltip:
+            followCursor: true
         series:
           - entity: sensor.molini_solaire_production
             name: Production
             type: area
             color: "#FFD337"
+            opacity: 0.35
+            stroke_width: 2
+            curve: smooth
+            float_precision: 0
+            group_by:
+              func: avg
+              duration: 10min
           - entity: sensor.molini_consommation_maison
             name: Consommation
             type: line
             color: "#161510"
+            stroke_width: 2
+            curve: smooth
+            float_precision: 0
+            group_by:
+              func: avg
+              duration: 10min
           - entity: sensor.molini_reseau_soutire
             name: Soutiré (EDF)
             type: line
             color: "#B3391F"
+            stroke_width: 2
+            curve: smooth
+            float_precision: 0
+            group_by:
+              func: avg
+              duration: 10min
 
   - type: grid
     cards:
