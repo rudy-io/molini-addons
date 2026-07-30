@@ -1,0 +1,82 @@
+# CI molini-addons — build Docker RÉEL de l'add-on, sans cache.
+#
+# Raison d'être : la 0.17.0 est partie sur le store avec un build cassé sur
+# une box VIERGE. `psutil` n'a pas de wheel musl/aarch64 → pip compile depuis
+# les sources → il faut gcc, absent de l'image de base. Le bug est resté
+# LATENT des mois, masqué par le cache de layer Docker (requirements
+# inchangés) ; il n'est apparu que quand un `--pull` a rafraîchi l'image de
+# base. Conséquence : une box neuve ne pouvait pas installer l'add-on —
+# l'install se serait plantée à l'étape 1, sur place, devant le client.
+#
+# La suite pytest ne voit RIEN de tout ça : elle ne construit pas d'image.
+# D'où ce job. Deux garde-fous que le bug de l'époque aurait déclenchés :
+#   - `--no-cache` + `--pull` : on repart de zéro, comme une box neuve ;
+#   - build **aarch64** (l'archi de la HA Green, le hardware standard) via
+#     QEMU — c'est là que psutil n'a pas de wheel. Un build amd64 seul serait
+#     passé au vert en laissant le bug entrer sur le store.
+name: build-addon
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "molini-agent/Dockerfile"
+      - "molini-agent/requirements.txt"
+      - "molini-agent/build.yaml"
+      - "molini-agent/config.yaml"
+      - "molini-agent/rootfs/**"
+      - "molini-agent/molini_agent/**"
+      - ".github/workflows/build.yml"
+  pull_request:
+  # Le bug d'origine venait de l'IMAGE DE BASE, pas d'un commit : un dépôt
+  # inchangé peut casser du jour au lendemain. D'où le passage hebdomadaire.
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # L'archi qui compte en premier : HA Green (hardware standard Moli).
+          - arch: aarch64
+            base: ghcr.io/home-assistant/aarch64-base-python:3.12-alpine3.20
+            platform: linux/arm64
+          # SKU Pro (mini-PC N100) + boxes x86.
+          - arch: amd64
+            base: ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20
+            platform: linux/amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: QEMU (émulation aarch64)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Lire la version de l'add-on
+        id: v
+        run: |
+          version=$(grep -E '^version:' molini-agent/config.yaml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Version add-on : $version"
+
+      - name: Build ${{ matrix.arch }} (sans cache, image de base rafraîchie)
+        uses: docker/build-push-action@v6
+        with:
+          context: molini-agent
+          file: molini-agent/Dockerfile
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            BUILD_FROM=${{ matrix.base }}
+            BUILD_VERSION=${{ steps.v.outputs.version }}
+          # Les deux options qui font tout l'intérêt du job : sans elles, le
+          # cache masquerait à nouveau ce type de régression.
+          no-cache: true
+          pull: true
+          push: false
+          load: false
