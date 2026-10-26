@@ -1,0 +1,37 @@
+---
+# Manifeste add-on Home Assistant — Moli OS
+# Moli OS (plateforme domotique en Rust, https://github.com/rudy-io/moli-os) à côté
+# de Home Assistant : même boîtier, chacun ses données. Le binaire vient de l'image
+# publiée par le dépôt (ghcr.io/rudy-io/moli-os), rien n'est compilé sur la box.
+
+slug: moli_os
+name: Moli OS
+version: "0.1.0"
+description: >-
+  Moli OS à côté de Home Assistant : énergie (pince, solaire, chauffe-eau piloté),
+  appareils locaux, tableau de bord sur le port 8790.
+url: https://github.com/rudy-io/moli-os
+arch:
+  - amd64
+  - aarch64
+
+boot: auto
+startup: services
+init: false
+
+# Réseau de la maison : Moli parle directement aux appareils (Shelly, onduleurs),
+# les retrouve par leur adresse MAC (table ARP), écoute les découvertes UDP.
+host_network: true
+
+# /config = le dossier de cet add-on (/addon_configs/<id>_moli_os) : moli.toml.
+# /data = privé à l'add-on : base, historique, coffre chiffré et sa clé.
+map:
+  - addon_config:rw
+
+ports:
+  8790/tcp: 8790
+ports_description:
+  8790/tcp: Tableau de bord, API et MCP de Moli OS
+
+options: {}
+schema: {}
