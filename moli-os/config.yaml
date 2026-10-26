@@ -6,7 +6,7 @@
 
 slug: moli_os
 name: Moli OS
-version: "0.1.0"
+version: "0.1.1"
 description: >-
   Moli OS à côté de Home Assistant : énergie (pince, solaire, chauffe-eau piloté),
   appareils locaux, tableau de bord sur le port 8790.
