@@ -661,6 +661,12 @@ HANDLERS = {
 }
 
 
+# Ces commandes reposent d'un bloc la config Moli que ``manage_ha_config: false``
+# coupe au démarrage. ``patch_ha_config`` reste permis : ses clés sont explicites,
+# c'est par lui qu'on pose le seul bloc ``http`` dont le tunnel a besoin.
+COMMANDS_REQUIRING_MANAGED_CONFIG = frozenset({"bootstrap_stack", "ensure_moli_config"})
+
+
 async def execute_one(cfg: Config, cmd: dict[str, Any]) -> None:
     cmd_id = cmd.get("id")
     cmd_type = cmd.get("type")
@@ -671,6 +677,16 @@ async def execute_one(cfg: Config, cmd: dict[str, Any]) -> None:
         log.warning("Unknown command type: %s", cmd_type)
         await report_result(
             cfg, cmd_id, "failed", error=f"unknown command type: {cmd_type}"
+        )
+        return
+
+    if cmd_type in COMMANDS_REQUIRING_MANAGED_CONFIG and not cfg.manage_ha_config:
+        log.warning("Command %s (%s) refused: manage_ha_config=false", cmd_id, cmd_type)
+        await report_result(
+            cfg,
+            cmd_id,
+            "failed",
+            error=f"{cmd_type} refusé : manage_ha_config est à false sur cette installation",
         )
         return
 

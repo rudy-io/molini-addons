@@ -20,6 +20,9 @@ class Config:
     linky_tempo_today_entity: str
     linky_tempo_tomorrow_entity: str
     prix_kwh: float
+    # False sur un Home Assistant déjà configuré par son propriétaire : l'agent
+    # ne touche pas à /config au démarrage (cf. main.apply_moli_ha_config).
+    manage_ha_config: bool = True
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -51,6 +54,10 @@ class Config:
                 "LINKY_TEMPO_TOMORROW_ENTITY", "sensor.rte_tempo_prochaine_couleur"
             ),
             prix_kwh=float(os.environ.get("PRIX_KWH") or "0.2516"),
+            # Seul un "false" explicite désactive : une option absente garde le
+            # comportement du parc existant.
+            manage_ha_config=os.environ.get("MANAGE_HA_CONFIG", "true").strip().lower()
+            != "false",
         )
 
 

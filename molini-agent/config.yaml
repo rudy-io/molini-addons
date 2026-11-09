@@ -4,7 +4,7 @@
 
 slug: molini_agent
 name: Moli Agent
-version: "0.22.0"
+version: "0.23.0"
 description: >-
   Agent Moli pour Home Assistant OS — heartbeat 5 min vers le central
   moli.energy, backups quotidiens chiffrés age + upload MinIO, et exécution
@@ -43,6 +43,9 @@ map:
 options:
   central_url: "https://moli.energy"
   client_token: ""
+  # false = Home Assistant déjà configuré par son propriétaire : l'agent ne dépose
+  # rien dans /config et ne modifie pas configuration.yaml au démarrage.
+  manage_ha_config: true
   heartbeat_interval_s: 300
   linky_power_entity: "sensor.linky_puissance_apparente"
   linky_hc_entity: "sensor.linky_index_hchc"
@@ -59,6 +62,7 @@ options:
 schema:
   central_url: "url"
   client_token: "password"
+  manage_ha_config: "bool"
   heartbeat_interval_s: "int(60,3600)"
   linky_power_entity: "str"
   linky_hc_entity: "str"

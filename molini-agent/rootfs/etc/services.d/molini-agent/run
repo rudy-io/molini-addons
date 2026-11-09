@@ -11,6 +11,7 @@ set -e
 # ─── Lecture des options config.yaml ──────────────────────────────────────────
 export CENTRAL_URL="$(bashio::config 'central_url')"
 export CLIENT_TOKEN="$(bashio::config 'client_token')"
+export MANAGE_HA_CONFIG="$(bashio::config 'manage_ha_config')"
 export HEARTBEAT_INTERVAL_S="$(bashio::config 'heartbeat_interval_s')"
 export LINKY_POWER_ENTITY="$(bashio::config 'linky_power_entity')"
 export LINKY_HC_ENTITY="$(bashio::config 'linky_hc_entity')"
@@ -59,10 +60,23 @@ case "${LOG_LEVEL}" in
 esac
 export MOLINI_LOG_LEVEL="${PY_LOG_LEVEL}"
 
+# ─── Home Assistant déjà configuré par son propriétaire ──────────────────────
+# manage_ha_config: false → rien n'est déposé dans /config (blocs, packages,
+# cartes, composant Moli AI). Seul un "false" explicite coupe : une option
+# absente garde le comportement du parc existant.
+manage_ha_config() {
+  [ "${MANAGE_HA_CONFIG}" != "false" ]
+}
+if ! manage_ha_config; then
+  bashio::log.info "manage_ha_config=false : aucun fichier déposé dans /config."
+fi
+
 # ─── Path packages HA pour ha_provision ──────────────────────────────────────
 # Sous HAOS le dossier /config est mappé vers /homeassistant côté core.
 export HA_PACKAGES_DIR="/config/packages"
-mkdir -p "${HA_PACKAGES_DIR}"
+if manage_ha_config; then
+  mkdir -p "${HA_PACKAGES_DIR}"
+fi
 
 # ─── Déploiement des blocs de dashboard packagés ─────────────────────────────
 # Les blocs Lovelace Moli sont embarqués dans l'image (/usr/share/molini/...) et
@@ -71,7 +85,7 @@ mkdir -p "${HA_PACKAGES_DIR}"
 # Moli, pas censés être édités à la main).
 BLOCKS_SRC="/usr/share/molini/dashboards/blocks"
 BLOCKS_DST="/config/dashboards/blocks"
-if [ -d "${BLOCKS_SRC}" ]; then
+if manage_ha_config && [ -d "${BLOCKS_SRC}" ]; then
   mkdir -p "${BLOCKS_DST}"
   if cp -f "${BLOCKS_SRC}"/*.yaml "${BLOCKS_DST}"/ 2>/dev/null; then
     bashio::log.info "Blocs dashboard déployés → ${BLOCKS_DST}"
@@ -85,7 +99,7 @@ fi
 # homeassistant: packages: !include_dir_named packages. Écrasés à chaque démarrage.
 PKG_SRC="/usr/share/molini/packages"
 PKG_DST="/config/packages"
-if [ -d "${PKG_SRC}" ]; then
+if manage_ha_config && [ -d "${PKG_SRC}" ]; then
   mkdir -p "${PKG_DST}"
   if cp -f "${PKG_SRC}"/*.yaml "${PKG_DST}"/ 2>/dev/null; then
     bashio::log.info "Packages Moli déployés → ${PKG_DST}"
@@ -100,7 +114,7 @@ fi
 # Évite d'avoir à installer/maintenir HACS manuellement sur chaque box.
 CARDS_SRC="/usr/share/molini/cards"
 CARDS_DST="/config/www/moli-cards"
-if [ -d "${CARDS_SRC}" ]; then
+if manage_ha_config && [ -d "${CARDS_SRC}" ]; then
   mkdir -p "${CARDS_DST}"
   if cp -f "${CARDS_SRC}"/*.js "${CARDS_DST}"/ 2>/dev/null; then
     bashio::log.info "Cartes Lovelace déployées → ${CARDS_DST}"
@@ -118,7 +132,7 @@ fi
 # l'auto-config (import flow) au prochain démarrage HA → l'occupant chatte avec Moli AI.
 MOLI_AI_SRC="/usr/share/molini/custom_components/moli_ai"
 MOLI_AI_DST="/config/custom_components/moli_ai"
-if [ -d "${MOLI_AI_SRC}" ]; then
+if manage_ha_config && [ -d "${MOLI_AI_SRC}" ]; then
   mkdir -p "/config/custom_components"
   cp -rf "${MOLI_AI_SRC}" "/config/custom_components/"
   printf '{"central_url": "%s", "token": "%s"}\n' "${CENTRAL_URL}" "${CLIENT_TOKEN}" > "${MOLI_AI_DST}/moli_config.json"

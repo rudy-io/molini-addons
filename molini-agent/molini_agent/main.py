@@ -35,6 +35,44 @@ async def send_heartbeat(cfg: Config, payload: dict[str, Any]) -> bool:
         return False
 
 
+def apply_moli_ha_config(cfg: Config) -> None:
+    """Pose les blocs de config Moli au démarrage de l'agent (box HAOS gérée).
+
+    Onboarding v0.8 : packages + dashboard, conservateur (n'écrit que ce qui
+    manque). 0.19.0 : patch config Moli (thème Le Relevé, trusted_proxies,
+    extra_module_url…), pour que le rollout d'un nouveau thème suive la MAJ de
+    l'add-on. Deep-merge idempotent, restart HA piloté par le central (jamais
+    auto au boot → pas de boucle de restart).
+
+    Ce patch écrase des valeurs existantes (``recorder.purge_keep_days``,
+    ``frontend.themes``) : il ne tourne jamais quand ``manage_ha_config`` est à
+    false, c'est-à-dire sur un Home Assistant configuré par son propriétaire.
+    """
+    if not is_haos():
+        return
+    if not cfg.manage_ha_config:
+        log.info("manage_ha_config=false : configuration.yaml laissé tel quel")
+        return
+
+    try:
+        mc = ensure_moli_ha_config()
+        if mc.get("changed"):
+            log.info("moli_config posé au boot — restart HA requis (piloté par le central)")
+    except Exception as e:
+        log.warning("ensure_moli_ha_config au boot: %s", e)
+
+    try:
+        from .bootstrap import MOLI_HA_CONFIG_PATCH, patch_ha_config
+        pr = patch_ha_config(MOLI_HA_CONFIG_PATCH)
+        if pr.get("changed"):
+            log.info(
+                "config Moli patchée au boot (%s) — restart HA requis (piloté par le central)",
+                ", ".join(pr.get("applied_keys", [])) or "modifs",
+            )
+    except Exception as e:
+        log.warning("patch config Moli au boot: %s", e)
+
+
 async def loop(cfg: Config) -> None:
     stop = asyncio.Event()
 
@@ -62,34 +100,7 @@ async def loop(cfg: Config) -> None:
             cfg.heartbeat_interval_s,
         )
 
-        # Onboarding v0.8 : pose des blocs config Moli (packages + dashboard)
-        # dès le boot — conservateur (n'écrit que ce qui manque), donc sans
-        # risque sur une box déjà configurée. Le restart HA qui charge ces
-        # blocs est séquencé par le central (jamais auto au boot → pas de
-        # boucle de restart).
-        if is_haos():
-            try:
-                mc = ensure_moli_ha_config()
-                if mc.get("changed"):
-                    log.info("moli_config posé au boot — restart HA requis (piloté par le central)")
-            except Exception as e:
-                log.warning("ensure_moli_ha_config au boot: %s", e)
-            # 0.19.0 — applique aussi le patch config Moli (thème Le Relevé,
-            # trusted_proxies, extra_module_url…) au boot : le rollout d'un
-            # nouveau thème suit ainsi la MAJ de l'add-on sur toute la flotte,
-            # sans dépendre d'un bootstrap_stack. Deep-merge idempotent ;
-            # comme moli_config, le restart HA qui le charge reste piloté par
-            # le central (jamais auto au boot).
-            try:
-                from .bootstrap import MOLI_HA_CONFIG_PATCH, patch_ha_config
-                pr = patch_ha_config(MOLI_HA_CONFIG_PATCH)
-                if pr.get("changed"):
-                    log.info(
-                        "config Moli patchée au boot (%s) — restart HA requis (piloté par le central)",
-                        ", ".join(pr.get("applied_keys", [])) or "modifs",
-                    )
-            except Exception as e:
-                log.warning("patch config Moli au boot: %s", e)
+        apply_moli_ha_config(cfg)
 
         backup_task = asyncio.create_task(backup_loop(cfg))
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.23.0
+
+**Installation existante : nouvelle option `manage_ha_config`** (activée par
+défaut, rien ne change pour le parc existant).
+
+À `false`, sur un Home Assistant déjà configuré par son propriétaire, l'agent
+ne dépose rien dans `/config` (blocs, packages, cartes, composant Moli AI) et ne
+modifie plus `configuration.yaml` au démarrage. Les commandes `bootstrap_stack`
+et `ensure_moli_config` sont refusées. Le suivi, les sauvegardes, le tunnel et
+`patch_ha_config` (clés explicites) continuent de fonctionner.
+
 ## 0.22.0
 
 **🗣️ Panneau « Moli » central + chat qui AGIT (borné niveau ≤ 2).**
