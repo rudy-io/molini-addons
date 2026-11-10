@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.23.1
+
+**`tunnel_install` fonctionne sur une box sans l'add-on cloudflared.** Il
+l'installe depuis le dépôt communautaire, garde les options existantes pour que
+le Supervisor accepte le jeton, et échoue clairement si ce jeton est refusé au
+lieu de démarrer l'add-on sans configuration. Un add-on déjà démarré est relancé
+pour charger le nouveau jeton.
+
 ## 0.23.0
 
 **Installation existante : nouvelle option `manage_ha_config`** (activée par

@@ -43,8 +43,6 @@ from .zigbee import detect_zigbee_stack
 log = logging.getLogger("molini_agent.commands")
 
 # Slug de l'add-on Cloudflare Tunnel communautaire (Tobi/cloudflared).
-# Le repo est ajouté à la volée si pas déjà installé.
-CLOUDFLARED_REPO = "https://github.com/brenner-tobias/ha-addons"
 CLOUDFLARED_SLUG_CANDIDATES = (
     # Le slug réel devient ``<repo_hash>_cloudflared``. On essaie ``cloudflared``
     # en premier (compat HA Yellow/Green pré-équipés) puis on liste pour trouver.
@@ -261,51 +259,32 @@ async def _find_cloudflared_slug() -> str | None:
 async def execute_tunnel_install(
     payload: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    """Installe + configure + démarre l'add-on cloudflared communautaire.
+    """Installe si besoin l'add-on cloudflared, lui donne son jeton et le démarre.
 
     payload attendu : ``{ "token": "...", "subdomain": "..." }``
-
-    Stratégie :
-    1. Si un add-on cloudflared est déjà installé → on pousse juste les options
-       et on (re)démarre.
-    2. Sinon, on ajoute le repo communautaire au store, on tente l'install via
-       le slug supposé.
     """
     token = (payload or {}).get("token")
     subdomain = (payload or {}).get("subdomain")
     if not token or not isinstance(token, str) or len(token) < 20:
         raise RuntimeError("missing or invalid token")
 
-    slug = await _find_cloudflared_slug()
-    if not slug:
-        # Ajout du repo, puis on retente la résolution du slug
-        try:
-            await supervisor_client.store_repositories_add(CLOUDFLARED_REPO)
-        except Exception as e:
-            raise RuntimeError(
-                f"impossible d'ajouter le repo cloudflared: {e}"
-            ) from e
-        slug = await _find_cloudflared_slug()
-        if not slug:
-            raise RuntimeError(
-                "add-on cloudflared introuvable après ajout du repo — "
-                "merci de l'installer manuellement depuis le store HA."
-            )
+    # Sans démarrer : sans son jeton, l'add-on s'arrête aussitôt.
+    addon = await install_or_start_addon("cloudflared", start=False)
+    slug = addon.get("slug")
+    if addon.get("status") == "failed" or not slug:
+        raise RuntimeError(f"add-on cloudflared non installé: {addon.get('error')}")
 
-    # Pose la config (le schéma exact dépend de l'add-on, on se contente du token)
-    options = {"tunnel_token": token}
-    try:
-        await supervisor_client.addon_options(slug, options)
-    except Exception as e:
-        log.warning("addon_options %s failed: %s — on tente quand même un start", slug, e)
+    # On repart des options actuelles : le Supervisor refuse un jeu incomplet, et
+    # un refus doit faire échouer la commande plutôt que démarrer sans jeton.
+    info = await supervisor_client.addon_info(slug)
+    await supervisor_client.addon_options(
+        slug, {**(info.get("options") or {}), "tunnel_token": token}
+    )
 
-    # Install si pas encore installé (l'API renvoie 400 si déjà — on tolère)
-    try:
-        await supervisor_client.addon_install(slug)
-    except Exception as e:
-        log.info("addon_install %s noop: %s", slug, e)
-
-    await supervisor_client.addon_start(slug)
+    if info.get("state") == "started":
+        await supervisor_client.addon_restart(slug)
+    else:
+        await supervisor_client.addon_start(slug)
     log.info("cloudflared add-on started — slug=%s subdomain=%s", slug, subdomain)
     return {"status": "running", "slug": slug, "subdomain": subdomain}
 
